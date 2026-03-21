@@ -405,6 +405,28 @@ gitea_systemd_memory_max: "2G"
 gitea_systemd_io_weight: 100
 
 # =============================================================================
+# LDAP Authentication Sources
+# =============================================================================
+
+# List of LDAP authentication sources to configure
+# Example:
+#   gitea_ldap_sources:
+#     - name: "Corporate LDAP"
+#       host: "ldap.example.com"
+#       port: 636
+#       security_protocol: ldaps
+#       bind_dn: "cn=readonly,dc=example,dc=com"
+#       bind_password: "{{ vault_ldap_bind_password }}"
+#       user_search_base: "ou=users,dc=example,dc=com"
+#       user_filter: "(&(objectClass=inetOrgPerson)(uid=%s))"
+#       admin_filter: "(memberOf=cn=admins,ou=groups,dc=example,dc=com)"
+#       username_attribute: uid
+#       firstname_attribute: givenName
+#       surname_attribute: sn
+#       email_attribute: mail
+gitea_ldap_sources: []
+
+# =============================================================================
 # Admin User
 # =============================================================================
 
