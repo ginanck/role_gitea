@@ -11,6 +11,7 @@
         owner: "{{ gitea_user }}"
         group: "{{ gitea_group }}"
         mode: "0640"
+      changed_when: false
       when: gitea_config_stat.stat.exists is defined and gitea_config_stat.stat.exists
 
     - name: Deploy Gitea app.ini Configuration File
