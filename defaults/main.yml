@@ -405,6 +405,18 @@ gitea_systemd_memory_max: "2G"
 gitea_systemd_io_weight: 100
 
 # =============================================================================
+# Admin User
+# =============================================================================
+
+# Initial admin user to create on first run
+# Example:
+#   gitea_admin_user:
+#     username: gitea_admin
+#     password: "{{ vault_gitea_admin_password }}"
+#     email: admin@example.com
+gitea_admin_user: {}
+
+# =============================================================================
 # Custom Branding and Themes
 # =============================================================================
 
