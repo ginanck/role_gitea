@@ -1,0 +1,137 @@
+---
+# tasks/customize.yml — Deploy custom logos, themes, templates, and public files
+
+# ---- Custom Logos & Favicons ----
+
+- name: Create Custom Logo Directory
+  ansible.builtin.file:
+    path: "{{ gitea_custom_dir }}/public/assets/img"
+    state: directory
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0750"
+  when: >-
+    gitea_custom_logo_svg or gitea_custom_logo_png or
+    gitea_custom_favicon_svg or gitea_custom_favicon_png or
+    gitea_custom_apple_touch_icon
+
+- name: Deploy Custom Logo SVG
+  ansible.builtin.copy:
+    src: "{{ gitea_custom_logo_svg }}"
+    dest: "{{ gitea_custom_dir }}/public/assets/img/logo.svg"
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0644"
+  when: gitea_custom_logo_svg | length > 0
+  notify: restart gitea
+
+- name: Deploy Custom Logo PNG
+  ansible.builtin.copy:
+    src: "{{ gitea_custom_logo_png }}"
+    dest: "{{ gitea_custom_dir }}/public/assets/img/logo.png"
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0644"
+  when: gitea_custom_logo_png | length > 0
+  notify: restart gitea
+
+- name: Deploy Custom Favicon SVG
+  ansible.builtin.copy:
+    src: "{{ gitea_custom_favicon_svg }}"
+    dest: "{{ gitea_custom_dir }}/public/assets/img/favicon.svg"
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0644"
+  when: gitea_custom_favicon_svg | length > 0
+  notify: restart gitea
+
+- name: Deploy Custom Favicon PNG
+  ansible.builtin.copy:
+    src: "{{ gitea_custom_favicon_png }}"
+    dest: "{{ gitea_custom_dir }}/public/assets/img/favicon.png"
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0644"
+  when: gitea_custom_favicon_png | length > 0
+  notify: restart gitea
+
+- name: Deploy Custom Apple Touch Icon
+  ansible.builtin.copy:
+    src: "{{ gitea_custom_apple_touch_icon }}"
+    dest: "{{ gitea_custom_dir }}/public/assets/img/apple-touch-icon.png"
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0644"
+  when: gitea_custom_apple_touch_icon | length > 0
+  notify: restart gitea
+
+# ---- Custom Footer Template ----
+
+- name: Create Custom Footer Template Directory
+  ansible.builtin.file:
+    path: "{{ gitea_custom_dir }}/templates/custom"
+    state: directory
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0750"
+  when: gitea_custom_footer_template | length > 0
+
+- name: Deploy Custom Footer Template
+  ansible.builtin.copy:
+    src: "{{ gitea_custom_footer_template }}"
+    dest: "{{ gitea_custom_dir }}/templates/custom/extra_links_footer.tmpl"
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0644"
+  when: gitea_custom_footer_template | length > 0
+  notify: restart gitea
+
+# ---- Custom CSS Themes ----
+
+- name: Create Custom CSS Directory
+  ansible.builtin.file:
+    path: "{{ gitea_custom_dir }}/public/css"
+    state: directory
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0750"
+  when: gitea_custom_themes | length > 0
+
+- name: Download Custom CSS Themes
+  ansible.builtin.get_url:
+    url: "{{ item.url }}"
+    dest: "{{ gitea_custom_dir }}/public/css/theme-{{ item.name }}.css"
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0644"
+    timeout: 60
+  loop: "{{ gitea_custom_themes }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: restart gitea
+
+# ---- Custom Public Files ----
+
+- name: Deploy Custom Public Files
+  ansible.builtin.copy:
+    src: "{{ gitea_custom_public_files_src }}"
+    dest: "{{ gitea_custom_dir }}/public/assets/"
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0644"
+    directory_mode: "0750"
+  when: gitea_custom_public_files_src | length > 0
+  notify: restart gitea
+
+# ---- Custom Templates Directory ----
+
+- name: Deploy Custom Templates
+  ansible.builtin.copy:
+    src: "{{ gitea_custom_templates_src }}"
+    dest: "{{ gitea_custom_dir }}/templates/"
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0644"
+    directory_mode: "0750"
+  when: gitea_custom_templates_src | length > 0
+  notify: restart gitea

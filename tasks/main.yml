@@ -1,0 +1,64 @@
+---
+# tasks/main.yml — Orchestrator for role_gitea
+
+- name: Fail on Unsupported Operating System
+  ansible.builtin.fail:
+    msg: "Unsupported OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+  when:
+    - ansible_facts['os_family'] not in ['RedHat', 'Debian']
+
+- name: Include OS-Specific Variables
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}.yml"
+
+- name: Install Prerequisite Packages
+  ansible.builtin.include_tasks: install_packages.yml
+
+- name: Create Gitea User and Group
+  ansible.builtin.include_tasks: create_user.yml
+  when: gitea_create_user
+
+- name: Create Gitea Directories
+  ansible.builtin.include_tasks: create_directories.yml
+
+- name: Download and Install Gitea Binary
+  ansible.builtin.include_tasks: install_gitea.yml
+
+- name: Generate Gitea Secrets
+  ansible.builtin.include_tasks: generate_secrets.yml
+
+- name: Deploy Gitea Configuration
+  ansible.builtin.include_tasks: configure.yml
+
+- name: Deploy Gitea Systemd Service
+  ansible.builtin.include_tasks: install_systemd.yml
+
+- name: Deploy Custom Branding and Themes
+  ansible.builtin.include_tasks: customize.yml
+  when: >-
+    gitea_custom_logo_svg or gitea_custom_logo_png or
+    gitea_custom_favicon_svg or gitea_custom_favicon_png or
+    gitea_custom_apple_touch_icon or
+    gitea_custom_footer_template or
+    gitea_custom_themes | length > 0 or
+    gitea_custom_public_files_src or
+    gitea_custom_templates_src
+
+- name: Configure Scheduled Backups
+  ansible.builtin.include_tasks: backup.yml
+  when: gitea_backup_enabled
+
+- name: Configure Fail2ban Integration
+  ansible.builtin.include_tasks: fail2ban.yml
+  when: gitea_fail2ban_enabled
+
+- name: Create Gitea Admin User
+  ansible.builtin.include_tasks: create_admin_user.yml
+  when: gitea_admin_user | length > 0
+
+- name: Configure LDAP Authentication Sources
+  ansible.builtin.include_tasks: configure_ldap.yml
+  when: gitea_ldap_sources | length > 0
+
+- name: Manage Local Gitea Users
+  ansible.builtin.include_tasks: manage_local_users.yml
+  when: gitea_local_users | length > 0

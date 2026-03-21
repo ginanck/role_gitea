@@ -1,0 +1,91 @@
+{#- jinja2: lstrip_blocks: true, trim_blocks: true -#}
+# {{ ansible_managed }}
+
+[Unit]
+Description=Gitea (Git with a cup of tea)
+Documentation=https://docs.gitea.com/
+After=syslog.target
+After=network.target
+{% if gitea_db_type == 'mysql' %}
+After=mysqld.service
+Wants=mysqld.service
+{% elif gitea_db_type == 'postgres' %}
+After=postgresql.service
+Wants=postgresql.service
+{% endif %}
+
+[Service]
+Type=simple
+User={{ gitea_user }}
+Group={{ gitea_group }}
+WorkingDirectory={{ gitea_work_dir }}
+ExecStart={{ gitea_binary_link_path }}/gitea web --config {{ gitea_config_path }}
+Restart=always
+RestartSec=10
+Environment=USER={{ gitea_user }}
+Environment=HOME={{ gitea_home_dir }}
+Environment=GITEA_WORK_DIR={{ gitea_work_dir }}
+
+{% if gitea_systemd_hardening_enabled %}
+# ==========================================================================
+# Security Hardening
+# ==========================================================================
+
+# Privilege escalation
+NoNewPrivileges=true
+RestrictSUIDSGID=true
+UMask=077
+
+# Filesystem protection
+PrivateTmp=true
+PrivateDevices=true
+DeviceAllow=
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths={{ gitea_data_dir }} {{ gitea_log_dir }} {{ gitea_config_dir }} {{ gitea_tmp_dir }}
+
+# Kernel protection
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectHostname=true
+ProtectClock=true
+ProtectControlGroups=true
+
+# Memory and IPC
+MemoryDenyWriteExecute=true
+RemoveIPC=true
+LockPersonality=true
+RestrictRealtime=true
+
+# Network
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+{% if gitea_systemd_cap_net_bind_service %}
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+{% else %}
+CapabilityBoundingSet=
+{% endif %}
+
+# Namespace restrictions
+RestrictNamespaces=true
+PrivateUsers=true
+
+# System call filtering
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@debug @mount @cpu-emulation @obsolete @privileged @resources @reboot @swap @raw-io @module
+{% endif %}
+
+{% if gitea_systemd_cgroup_enabled %}
+# ==========================================================================
+# cgroup Resource Restrictions
+# ==========================================================================
+CPUWeight={{ gitea_systemd_cpu_weight }}
+CPUQuota={{ gitea_systemd_cpu_quota }}
+MemoryMax={{ gitea_systemd_memory_max }}
+IOWeight={{ gitea_systemd_io_weight }}
+{% endif %}
+
+[Install]
+WantedBy=multi-user.target

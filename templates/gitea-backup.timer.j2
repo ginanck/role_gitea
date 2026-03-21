@@ -1,0 +1,12 @@
+{#- jinja2: lstrip_blocks: true, trim_blocks: true -#}
+# {{ ansible_managed }}
+
+[Unit]
+Description=Gitea Scheduled Backup Timer
+
+[Timer]
+OnCalendar={{ gitea_backup_schedule }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

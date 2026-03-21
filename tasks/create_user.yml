@@ -1,0 +1,18 @@
+---
+# tasks/create_user.yml — Create Gitea system user and group
+
+- name: Create Gitea Group
+  ansible.builtin.group:
+    name: "{{ gitea_group }}"
+    state: present
+    system: true
+
+- name: Create Gitea User
+  ansible.builtin.user:
+    name: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    home: "{{ gitea_home_dir }}"
+    shell: "{{ gitea_shell }}"
+    system: true
+    create_home: true
+    state: present

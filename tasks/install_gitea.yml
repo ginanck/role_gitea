@@ -1,0 +1,81 @@
+---
+# tasks/install_gitea.yml — Download, verify, and install Gitea binary
+
+- name: Check If Gitea Binary Already Exists
+  ansible.builtin.stat:
+    path: "{{ gitea_binary_path }}"
+  register: gitea_binary_stat
+
+- name: Download and Verify Gitea Binary
+  when: not gitea_binary_stat.stat.exists
+  block:
+    - name: Download Gitea Binary
+      ansible.builtin.get_url:
+        url: "{{ gitea_download_url }}"
+        dest: "{{ gitea_binary_path }}"
+        owner: root
+        group: root
+        mode: "0755"
+        timeout: 300
+
+    - name: Download Gitea Checksum File
+      ansible.builtin.get_url:
+        url: "{{ gitea_checksum_url }}"
+        dest: "{{ gitea_versioned_dir }}/gitea.sha256"
+        owner: root
+        group: root
+        mode: "0644"
+        timeout: 60
+
+    - name: Verify Gitea Binary Checksum
+      ansible.builtin.command:
+        cmd: "sha256sum --check gitea.sha256"
+        chdir: "{{ gitea_versioned_dir }}"
+      register: gitea_checksum_result
+      changed_when: false
+      failed_when: gitea_checksum_result.rc != 0
+
+    - name: Import Gitea GPG Key
+      ansible.builtin.command:
+        cmd: "gpg --keyserver keys.openpgp.org --recv-keys {{ gitea_gpg_key_fingerprint }}"
+      register: gitea_gpg_import
+      changed_when: "'imported' in gitea_gpg_import.stderr"
+      failed_when: false
+      when: gitea_verify_gpg
+
+    - name: Download Gitea GPG Signature
+      ansible.builtin.get_url:
+        url: "{{ gitea_gpg_signature_url }}"
+        dest: "{{ gitea_versioned_dir }}/gitea.asc"
+        owner: root
+        group: root
+        mode: "0644"
+        timeout: 60
+      when: gitea_verify_gpg
+
+    - name: Verify Gitea Binary GPG Signature
+      ansible.builtin.command:
+        cmd: "gpg --verify gitea.asc gitea"
+        chdir: "{{ gitea_versioned_dir }}"
+      register: gitea_gpg_verify
+      changed_when: false
+      failed_when: gitea_gpg_verify.rc != 0
+      when: gitea_verify_gpg
+
+  rescue:
+    - name: Remove Incomplete Gitea Binary on Failure
+      ansible.builtin.file:
+        path: "{{ gitea_binary_path }}"
+        state: absent
+
+    - name: Fail After Cleanup
+      ansible.builtin.fail:
+        msg: "Gitea binary download or verification failed — incomplete files removed"
+
+- name: Create Gitea Binary Symlink
+  ansible.builtin.file:
+    src: "{{ gitea_binary_path }}"
+    dest: "{{ gitea_binary_link_path }}/gitea"
+    state: link
+    force: true
+  notify: restart gitea

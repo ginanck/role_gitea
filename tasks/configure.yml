@@ -1,0 +1,39 @@
+---
+# tasks/configure.yml — Deploy Gitea app.ini configuration
+
+- name: Deploy Gitea Configuration
+  block:
+    - name: Back Up Current Configuration
+      ansible.builtin.copy:
+        src: "{{ gitea_config_path }}"
+        dest: "{{ gitea_config_path }}.bak"
+        remote_src: true
+        owner: "{{ gitea_user }}"
+        group: "{{ gitea_group }}"
+        mode: "0640"
+      when: gitea_config_stat.stat.exists is defined and gitea_config_stat.stat.exists
+
+    - name: Deploy Gitea app.ini Configuration File
+      ansible.builtin.template:
+        src: app.ini.j2
+        dest: "{{ gitea_config_path }}"
+        owner: "{{ gitea_user }}"
+        group: "{{ gitea_group }}"
+        mode: "0640"
+        backup: true
+      notify: restart gitea
+
+  rescue:
+    - name: Restore Previous Configuration on Failure
+      ansible.builtin.copy:
+        src: "{{ gitea_config_path }}.bak"
+        dest: "{{ gitea_config_path }}"
+        remote_src: true
+        owner: "{{ gitea_user }}"
+        group: "{{ gitea_group }}"
+        mode: "0640"
+      when: gitea_config_stat.stat.exists is defined and gitea_config_stat.stat.exists
+
+    - name: Log Configuration Deployment Failure
+      ansible.builtin.debug:
+        msg: "Gitea configuration deployment failed — rolled back to previous version"

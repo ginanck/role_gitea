@@ -1,0 +1,599 @@
+---
+# defaults file for role_gitea
+# Releases: https://gitea.io/en-us/ / https://github.com/go-gitea/gitea/releases
+
+# =============================================================================
+# Core Configuration
+# =============================================================================
+
+gitea_version: "1.23.4"
+gitea_user: gitea
+gitea_group: gitea
+gitea_shell: /bin/bash
+gitea_create_user: true
+
+# Architecture mapping (auto-detected)
+# Supported: amd64, arm64, armv6
+# gitea_arch: "amd64"
+
+# =============================================================================
+# Download & Installation
+# =============================================================================
+
+gitea_download_url: "https://dl.gitea.com/gitea/{{ gitea_version }}/gitea-{{ gitea_version }}-linux-{{ gitea_arch }}"
+gitea_checksum_url: "https://dl.gitea.com/gitea/{{ gitea_version }}/gitea-{{ gitea_version }}-linux-{{ gitea_arch }}.sha256"
+gitea_gpg_key_url: "https://keys.openpgp.org/vks/v1/by-fingerprint/7C9E68152594688862D62AF62D9AE806EC1592E2"
+gitea_gpg_signature_url: "https://dl.gitea.com/gitea/{{ gitea_version }}/gitea-{{ gitea_version }}-linux-{{ gitea_arch }}.asc"
+gitea_verify_gpg: true
+
+# =============================================================================
+# Paths
+# =============================================================================
+
+gitea_dir: "/opt/gitea"
+gitea_versioned_dir: "{{ gitea_dir }}/{{ gitea_version }}"
+gitea_binary_path: "{{ gitea_versioned_dir }}/gitea"
+gitea_binary_link_path: "/usr/local/bin"
+gitea_config_dir: "/etc/gitea"
+gitea_config_path: "{{ gitea_config_dir }}/app.ini"
+gitea_data_dir: "/var/lib/gitea"
+gitea_custom_dir: "{{ gitea_data_dir }}/custom"
+gitea_log_dir: "/var/log/gitea"
+gitea_work_dir: "{{ gitea_data_dir }}"
+gitea_home_dir: "{{ gitea_data_dir }}"
+gitea_tmp_dir: "/tmp/gitea"
+
+# Repository storage
+gitea_repository_root: "{{ gitea_data_dir }}/repositories"
+gitea_lfs_content_path: "{{ gitea_data_dir }}/lfs"
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+
+gitea_service_name: gitea
+gitea_service_enabled: true
+gitea_service_state: started
+
+# =============================================================================
+# Server Configuration
+# =============================================================================
+
+gitea_server_protocol: http
+gitea_server_domain: localhost
+gitea_server_root_url: "{{ gitea_server_protocol }}://{{ gitea_server_domain }}:{{ gitea_server_http_port }}/"
+gitea_server_http_addr: "0.0.0.0"
+gitea_server_http_port: 3000
+gitea_server_ssh_domain: "{{ gitea_server_domain }}"
+gitea_server_ssh_port: 22
+gitea_server_start_ssh_server: false
+gitea_server_offline_mode: false
+gitea_server_landing_page: home
+gitea_server_lfs_start_server: true
+gitea_server_lfs_jwt_secret: ""
+
+# =============================================================================
+# Database Configuration
+# =============================================================================
+
+# Supported: sqlite3, mysql, postgres
+gitea_db_type: sqlite3
+gitea_db_host: "127.0.0.1:3306"
+gitea_db_name: gitea
+gitea_db_user: gitea
+gitea_db_password: ""
+gitea_db_path: "{{ gitea_data_dir }}/gitea.db"
+gitea_db_ssl_mode: disable
+gitea_db_charset: utf8mb4
+gitea_db_log_sql: false
+
+# =============================================================================
+# Security
+# =============================================================================
+
+gitea_secret_key: ""
+gitea_internal_token: ""
+gitea_install_lock: true
+gitea_disable_git_hooks: true
+gitea_password_complexity: "off"
+gitea_min_password_length: 8
+
+# =============================================================================
+# Repository Defaults
+# =============================================================================
+
+gitea_repository_default_branch: main
+gitea_repository_default_private: last
+gitea_repository_max_creation_limit: -1
+gitea_repository_mirror_queue_length: 1000
+gitea_repository_pull_request_default_merge_style: merge
+gitea_repository_force_private: false
+gitea_repository_disabled_types: ""
+
+# =============================================================================
+# Service Settings (User Registration & Access)
+# =============================================================================
+
+gitea_service_register_email_confirm: false
+gitea_service_enable_notify_mail: false
+gitea_service_disable_registration: false
+gitea_service_allow_only_external_registration: false
+gitea_service_require_signin_view: false
+gitea_service_default_keep_email_private: false
+gitea_service_default_allow_create_organization: true
+gitea_service_enable_timetracking: true
+gitea_service_default_enable_timetracking: true
+gitea_service_no_reply_address: "noreply.{{ gitea_server_domain }}"
+
+# =============================================================================
+# Mailer Configuration
+# =============================================================================
+
+gitea_mailer_enabled: false
+gitea_mailer_protocol: smtp+starttls
+gitea_mailer_smtp_addr: ""
+gitea_mailer_smtp_port: 587
+gitea_mailer_user: ""
+gitea_mailer_password: ""
+gitea_mailer_from: ""
+
+# =============================================================================
+# Session Configuration
+# =============================================================================
+
+gitea_session_provider: file
+gitea_session_provider_config: "{{ gitea_data_dir }}/sessions"
+
+# =============================================================================
+# Cache Configuration
+# =============================================================================
+
+gitea_cache_adapter: memory
+gitea_cache_host: ""
+gitea_cache_interval: 60
+
+# =============================================================================
+# Indexer Configuration
+# =============================================================================
+
+gitea_indexer_issue_type: bleve
+gitea_indexer_issue_path: "{{ gitea_data_dir }}/indexers/issues.bleve"
+gitea_indexer_repo_enabled: true
+gitea_indexer_repo_path: "{{ gitea_data_dir }}/indexers/repos.bleve"
+gitea_indexer_repo_type: bleve
+
+# =============================================================================
+# Log Configuration
+# =============================================================================
+
+gitea_log_mode: console
+gitea_log_level: Info
+gitea_log_root_path: "{{ gitea_log_dir }}"
+
+# =============================================================================
+# OAuth2 / JWT
+# =============================================================================
+
+gitea_oauth2_enabled: true
+gitea_oauth2_jwt_secret: ""
+
+# =============================================================================
+# Actions (CI/CD Runner Support)
+# =============================================================================
+
+gitea_actions_enabled: false
+
+# =============================================================================
+# Picture / Avatar
+# =============================================================================
+
+gitea_picture_gravatar_source: gravatar
+gitea_picture_disable_gravatar: false
+gitea_picture_enable_federated_avatar: true
+
+# =============================================================================
+# Attachment Configuration
+# =============================================================================
+
+gitea_attachment_enabled: true
+gitea_attachment_path: "{{ gitea_data_dir }}/attachments"
+gitea_attachment_max_size: 4
+gitea_attachment_allowed_types: ""
+
+# =============================================================================
+# Backup Configuration
+# =============================================================================
+
+gitea_backup_enabled: false
+gitea_backup_dir: "/opt/gitea/backups"
+gitea_backup_schedule: "*-*-* 02:00:00"
+gitea_backup_type: zip
+gitea_backup_retention_days: 30
+
+# =============================================================================
+# Fail2ban Configuration
+# =============================================================================
+
+gitea_fail2ban_enabled: false
+gitea_fail2ban_maxretry: 5
+gitea_fail2ban_findtime: 3600
+gitea_fail2ban_bantime: 900
+gitea_fail2ban_action: "%(action_mwl)s"
+
+# =============================================================================
+# Systemd Hardening
+# =============================================================================
+
+gitea_systemd_cap_net_bind_service: false
+
+# =============================================================================
+# Additional app.ini Sections (Advanced)
+# =============================================================================
+
+# Pass arbitrary key-value pairs to app.ini sections not covered above.
+# Example:
+#   gitea_extra_config:
+#     webhook:
+#       DELIVER_TIMEOUT: 30
+#       ALLOWED_HOST_LIST: "external"
+#     cron:
+#       ENABLED: true
+#     "cron.sync_external_users":
+#       SCHEDULE: "@every 24h"
+#       UPDATE_EXISTING: true
+gitea_extra_config: {}
+
+# =============================================================================
+# Prerequisite Packages
+# =============================================================================
+
+gitea_prerequisite_packages:
+  - git
+  - gnupg
+
+# =============================================================================
+# LDAP Authentication
+# =============================================================================
+
+# List of LDAP authentication sources to configure via `gitea admin auth`.
+# Each item is a dict representing one LDAP source. Supports both
+# "ldap" (bind DN search) and "ldap-simple" (direct bind with DN template).
+#
+# Example — OpenLDAP with bind DN search:
+#   gitea_ldap_sources:
+#     - name: "Corporate LDAP"
+#       type: ldap                          # ldap or ldap-simple
+#       host: "ldap.example.com"
+#       port: 636
+#       encryption: ldaps                   # disable, starttls, ldaps
+#       bind_dn: "cn=readonly,dc=example,dc=com"
+#       bind_password: "{{ vault_gitea_ldap_bind_password }}"
+#       user_search_base: "ou=people,dc=example,dc=com"
+#       user_filter: "(&(objectClass=posixAccount)(uid=%s))"
+#       admin_filter: "(memberOf=cn=admins,ou=groups,dc=example,dc=com)"
+#       username_attribute: uid
+#       firstname_attribute: givenName
+#       surname_attribute: sn
+#       email_attribute: mail
+#       public_ssh_key_attribute: sshPublicKey
+#       avatar_attribute: jpegPhoto
+#       skip_tls_verify: false
+#       sync_users: true
+#       active: true
+#
+# Example — Active Directory:
+#   gitea_ldap_sources:
+#     - name: "Active Directory"
+#       type: ldap
+#       host: "dc01.corp.example.com"
+#       port: 389
+#       encryption: starttls
+#       bind_dn: "CN=Gitea Service,OU=Service Accounts,DC=corp,DC=example,DC=com"
+#       bind_password: "{{ vault_gitea_ad_bind_password }}"
+#       user_search_base: "DC=corp,DC=example,DC=com"
+#       user_filter: "(&(objectCategory=Person)(sAMAccountName=%s)(!(UserAccountControl:1.2.840.113556.1.4.803:=2)))"
+#       admin_filter: "(memberOf=CN=Gitea Admins,OU=Groups,DC=corp,DC=example,DC=com)"
+#       username_attribute: sAMAccountName
+#       firstname_attribute: givenName
+#       surname_attribute: sn
+#       email_attribute: mail
+#       skip_tls_verify: false
+#       sync_users: true
+#       active: true
+#
+# Example — LDAP Simple (direct bind):
+#   gitea_ldap_sources:
+#     - name: "Simple LDAP"
+#       type: ldap-simple
+#       host: "ldap.example.com"
+#       port: 389
+#       encryption: starttls
+#       user_dn: "uid=%s,ou=people,dc=example,dc=com"
+#       user_filter: "(objectClass=posixAccount)"
+#       user_search_base: "ou=people,dc=example,dc=com"
+#       username_attribute: uid
+#       email_attribute: mail
+#       skip_tls_verify: false
+#       active: true
+gitea_ldap_sources: []
+
+# =============================================================================
+# Admin User
+# =============================================================================
+
+# Create a Gitea admin user during initial setup.
+# Only created if the user does not already exist.
+# Example:
+#   gitea_admin_user:
+#     username: gitea_admin
+#     password: "{{ vault_gitea_admin_password }}"
+#     email: admin@example.com
+gitea_admin_user: {}
+
+# =============================================================================
+# Local Users
+# =============================================================================
+
+# Manage local Gitea users via CLI.
+# Each item: name, password, email, admin (bool), must_change_password (bool), state (present/absent).
+# Example:
+#   gitea_local_users:
+#     - name: developer1
+#       password: "{{ vault_gitea_user_developer1 }}"
+#       email: dev1@example.com
+#       admin: false
+#       must_change_password: true
+#       state: present
+#     - name: old_user
+#       state: absent
+gitea_local_users: []
+
+# =============================================================================
+# UI / Themes
+# =============================================================================
+
+gitea_ui_themes: "gitea-auto,gitea-light,gitea-dark"
+gitea_ui_default_theme: "gitea-auto"
+gitea_ui_show_user_email: true
+gitea_ui_search_repo_description: true
+gitea_ui_max_display_file_size: 8388608
+gitea_ui_reactions: "+1,-1,laugh,hooray,confused,heart,rocket,eyes"
+gitea_ui_default_show_full_name: false
+gitea_ui_explore_paging_num: 20
+gitea_ui_issue_paging_num: 20
+gitea_ui_members_paging_num: 20
+gitea_ui_feed_max_commit_num: 5
+gitea_ui_feed_paging_num: 20
+gitea_ui_graph_max_commit_num: 100
+
+# =============================================================================
+# Webhook Configuration
+# =============================================================================
+
+gitea_webhook_queue_length: 1000
+gitea_webhook_deliver_timeout: 5
+gitea_webhook_allowed_host_list: "external"
+gitea_webhook_skip_tls_verify: false
+gitea_webhook_paging_num: 10
+gitea_webhook_proxy_url: ""
+
+# =============================================================================
+# CORS Configuration
+# =============================================================================
+
+gitea_cors_enabled: false
+gitea_cors_scheme: "https"
+gitea_cors_allow_domain: "*"
+gitea_cors_allow_subdomain: false
+gitea_cors_methods: "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS"
+gitea_cors_max_age: 10
+gitea_cors_allow_credentials: false
+gitea_cors_headers: "Content-Type,User-Agent"
+gitea_cors_x_frame_options: "SAMEORIGIN"
+
+# =============================================================================
+# Metrics & Monitoring
+# =============================================================================
+
+gitea_metrics_enabled: false
+gitea_metrics_token: ""
+
+# =============================================================================
+# API Configuration
+# =============================================================================
+
+gitea_api_enable_swagger: true
+gitea_api_max_response_items: 50
+gitea_api_default_paging_num: 30
+gitea_api_default_git_trees_per_page: 1000
+gitea_api_default_max_blob_size: 10485760
+
+# =============================================================================
+# OpenID Configuration
+# =============================================================================
+
+gitea_openid_enable_openid_signin: false
+gitea_openid_enable_openid_signup: false
+
+# =============================================================================
+# Packages
+# =============================================================================
+
+gitea_packages_enabled: true
+gitea_packages_chunked_upload_path: "{{ gitea_data_dir }}/tmp/package-upload"
+
+# =============================================================================
+# Federation
+# =============================================================================
+
+gitea_federation_enabled: false
+
+# =============================================================================
+# Migrations
+# =============================================================================
+
+gitea_migrations_allowed_domains: ""
+gitea_migrations_blocked_domains: ""
+gitea_migrations_allow_local_networks: false
+gitea_migrations_skip_tls_verify: false
+gitea_migrations_max_attempts: 3
+gitea_migrations_retry_backoff: 3
+
+# =============================================================================
+# Mirror Configuration
+# =============================================================================
+
+gitea_mirror_enabled: true
+gitea_mirror_disable_new_pull: false
+gitea_mirror_disable_new_push: false
+gitea_mirror_default_interval: "8h"
+gitea_mirror_min_interval: "10m"
+
+# =============================================================================
+# Proxy Configuration
+# =============================================================================
+
+gitea_proxy_enabled: false
+gitea_proxy_url: ""
+gitea_proxy_hosts: ""
+
+# =============================================================================
+# Cron Jobs
+# =============================================================================
+
+gitea_cron_enabled: true
+gitea_cron_run_at_start: false
+
+# Sync external users (LDAP) — only used when LDAP sync_users is true
+gitea_cron_sync_external_users_schedule: "@every 24h"
+gitea_cron_sync_external_users_update_existing: true
+
+# Repository archive cleanup
+gitea_cron_archive_cleanup_schedule: "@every 24h"
+gitea_cron_archive_cleanup_older_than: "24h"
+
+# Cleanup old actions
+gitea_cron_cleanup_actions_schedule: "@every 24h"
+gitea_cron_cleanup_actions_older_than: "8760h"
+
+# =============================================================================
+# Markup / Rendering
+# =============================================================================
+
+# Enable math rendering ($..$ / $$..$$)
+gitea_markup_math_enabled: true
+
+# External renderers — list of dicts for custom file type rendering.
+# Example:
+#   gitea_markup_external_renderers:
+#     - name: asciidoc
+#       enabled: true
+#       file_extensions: ".adoc,.asciidoc"
+#       render_command: "asciidoc --backend=xhtml11 --no-header-footer --attribute stylesheet=  -o - -"
+#       is_input_file: false
+gitea_markup_external_renderers: []
+
+# =============================================================================
+# SSH Configuration
+# =============================================================================
+
+gitea_ssh_minimum_key_sizes_ed25519: 256
+gitea_ssh_minimum_key_sizes_ecdsa: 256
+gitea_ssh_minimum_key_sizes_rsa: 2048
+gitea_ssh_minimum_key_sizes_dsa: -1
+
+# =============================================================================
+# Git Configuration
+# =============================================================================
+
+gitea_git_max_diff_lines: 1000
+gitea_git_max_diff_line_characters: 5000
+gitea_git_max_diff_files: 100
+gitea_git_gc_args: ""
+gitea_git_enable_auto_git_wire_protocol: true
+gitea_git_timeout_default: 360
+gitea_git_timeout_migrate: 600
+gitea_git_timeout_mirror: 300
+gitea_git_timeout_clone: 300
+gitea_git_timeout_pull: 300
+gitea_git_timeout_gc: 60
+
+# =============================================================================
+# Customization — Logos & Branding
+# =============================================================================
+
+# Custom APP_NAME displayed in title bar and footer.
+gitea_app_name: "Gitea: Git with a cup of tea"
+
+# Custom logo files. Set each to a local file path to replace defaults.
+# Files are deployed to {{ gitea_custom_dir }}/public/assets/img/
+# Example:
+#   gitea_custom_logo_svg: "files/gitea/logo.svg"
+#   gitea_custom_logo_png: "files/gitea/logo.png"
+#   gitea_custom_favicon_svg: "files/gitea/favicon.svg"
+#   gitea_custom_favicon_png: "files/gitea/favicon.png"
+#   gitea_custom_apple_touch_icon: "files/gitea/apple-touch-icon.png"
+gitea_custom_logo_svg: ""
+gitea_custom_logo_png: ""
+gitea_custom_favicon_svg: ""
+gitea_custom_favicon_png: ""
+gitea_custom_apple_touch_icon: ""
+
+# =============================================================================
+# Customization — Footer
+# =============================================================================
+
+# Custom footer template. Set to a local file path containing Gitea template HTML.
+# Deployed to {{ gitea_custom_dir }}/templates/custom/extra_links_footer.tmpl
+# Example:
+#   gitea_custom_footer_template: "files/gitea/extra_links_footer.tmpl"
+gitea_custom_footer_template: ""
+
+# =============================================================================
+# Customization — Custom CSS / Themes
+# =============================================================================
+
+# Deploy custom CSS themes from URLs.
+# Each item: { name: "theme-name", url: "https://..." }
+# Downloaded to {{ gitea_custom_dir }}/public/css/theme-<name>.css
+# Add theme names to gitea_ui_themes to make them selectable.
+# Example:
+#   gitea_custom_themes:
+#     - name: catppuccin-mocha
+#       url: "https://example.com/catppuccin-mocha.css"
+#     - name: dracula
+#       url: "https://example.com/dracula.css"
+gitea_custom_themes: []
+
+# =============================================================================
+# Customization — Public Files
+# =============================================================================
+
+# Copy a local directory tree to {{ gitea_custom_dir }}/public/assets/
+# Use this for custom JS, images, or any static assets.
+# Example:
+#   gitea_custom_public_files_src: "files/gitea/custom_assets/"
+gitea_custom_public_files_src: ""
+
+# =============================================================================
+# Customization — Custom Templates
+# =============================================================================
+
+# Copy a local directory tree to {{ gitea_custom_dir }}/templates/
+# Use this for header/body injection, custom page templates, etc.
+# Example:
+#   gitea_custom_templates_src: "files/gitea/custom_templates/"
+gitea_custom_templates_src: ""
+
+# =============================================================================
+# Systemd Hardening (Extended)
+# =============================================================================
+
+gitea_systemd_hardening_enabled: true
+
+# cgroup resource restrictions
+gitea_systemd_cgroup_enabled: false
+gitea_systemd_cpu_weight: 1024
+gitea_systemd_cpu_quota: "80%"
+gitea_systemd_memory_max: "4G"
+gitea_systemd_io_weight: 80
