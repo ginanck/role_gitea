@@ -27,13 +27,26 @@
         mode: "0644"
         timeout: 60
 
-    - name: Verify Gitea Binary Checksum
+    - name: Read Expected Checksum
       ansible.builtin.command:
-        cmd: "sha256sum --check gitea.sha256"
-        chdir: "{{ gitea_versioned_dir }}"
-      register: gitea_checksum_result
+        cmd: "awk '{ print $1 }' {{ gitea_versioned_dir }}/gitea.sha256"
+      register: gitea_expected_checksum
       changed_when: false
-      failed_when: gitea_checksum_result.rc != 0
+
+    - name: Compute Actual Checksum of Gitea Binary
+      ansible.builtin.stat:
+        path: "{{ gitea_binary_path }}"
+        checksum_algorithm: sha256
+      register: gitea_binary_checksum
+
+    - name: Verify Gitea Binary Checksum
+      ansible.builtin.assert:
+        that:
+          - gitea_binary_checksum.stat.checksum == gitea_expected_checksum.stdout
+        fail_msg: >-
+          Checksum mismatch — expected {{ gitea_expected_checksum.stdout }},
+          got {{ gitea_binary_checksum.stat.checksum }}
+        success_msg: "Gitea binary checksum verified"
 
     - name: Import Gitea GPG Key
       ansible.builtin.command:
