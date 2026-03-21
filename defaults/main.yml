@@ -405,6 +405,33 @@ gitea_systemd_memory_max: "2G"
 gitea_systemd_io_weight: 100
 
 # =============================================================================
+# Custom Branding and Themes
+# =============================================================================
+
+# Path to custom logo/favicon files (local paths on the Ansible controller)
+# Leave empty to use Gitea defaults
+gitea_custom_logo_svg: ""
+gitea_custom_logo_png: ""
+gitea_custom_favicon_svg: ""
+gitea_custom_favicon_png: ""
+gitea_custom_apple_touch_icon: ""
+
+# Path to a custom footer template file on the Ansible controller
+gitea_custom_footer_template: ""
+
+# List of custom CSS theme files to deploy
+# Example:
+#   gitea_custom_themes:
+#     - { name: "theme-custom", src: "files/theme-custom.css" }
+gitea_custom_themes: []
+
+# Path to a directory of custom public files to sync (on the Ansible controller)
+gitea_custom_public_files_src: ""
+
+# Path to a directory of custom templates to sync (on the Ansible controller)
+gitea_custom_templates_src: ""
+
+# =============================================================================
 # Additional app.ini Sections (Advanced)
 # =============================================================================
 
