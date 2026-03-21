@@ -427,6 +427,18 @@ gitea_systemd_io_weight: 100
 gitea_ldap_sources: []
 
 # =============================================================================
+# Local Users
+# =============================================================================
+
+# List of local Gitea users to create/manage
+# Example:
+#   gitea_local_users:
+#     - username: developer
+#       password: "{{ vault_gitea_developer_password }}"
+#       email: developer@example.com
+gitea_local_users: []
+
+# =============================================================================
 # Admin User
 # =============================================================================
 
