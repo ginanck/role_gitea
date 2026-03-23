@@ -22,7 +22,6 @@
         group: "{{ gitea_group }}"
         mode: "0640"
         backup: true
-      notify: restart gitea
 
   rescue:
     - name: Restore Previous Configuration on Failure

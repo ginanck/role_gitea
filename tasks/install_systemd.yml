@@ -12,9 +12,6 @@
     - reload systemd
     - restart gitea
 
-- name: Flush Handlers to Reload Systemd Before Service Start
-  ansible.builtin.meta: flush_handlers
-
 - name: Enable and Start Gitea Service
   ansible.builtin.systemd:
     name: "{{ gitea_service_name }}"
