@@ -21,7 +21,6 @@
         owner: "{{ gitea_user }}"
         group: "{{ gitea_group }}"
         mode: "0640"
-        backup: true
 
   rescue:
     - name: Restore Previous Configuration on Failure
