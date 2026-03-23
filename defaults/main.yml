@@ -109,7 +109,6 @@ gitea_min_password_length: 8
 gitea_repository_default_branch: main
 gitea_repository_default_private: last
 gitea_repository_max_creation_limit: -1
-gitea_repository_mirror_queue_length: 1000
 gitea_repository_pull_request_default_merge_style: merge
 gitea_repository_force_private: false
 gitea_repository_disabled_types: ""
@@ -324,6 +323,7 @@ gitea_mirror_disable_new_pull: false
 gitea_mirror_disable_new_push: false
 gitea_mirror_default_interval: 8h
 gitea_mirror_min_interval: 10m
+gitea_mirror_queue_length: 1000
 
 # =============================================================================
 # Proxy Configuration
@@ -390,21 +390,11 @@ gitea_git_timeout_pull: 300
 gitea_git_timeout_gc: 60
 
 # =============================================================================
-# Systemd Hardening
+# Systemd
 # =============================================================================
 
-gitea_systemd_hardening_enabled: true
+# Set to true to bind Gitea to ports below 1024
 gitea_systemd_cap_net_bind_service: false
-
-# =============================================================================
-# Systemd cgroup Resource Restrictions
-# =============================================================================
-
-gitea_systemd_cgroup_enabled: false
-gitea_systemd_cpu_weight: 100
-gitea_systemd_cpu_quota: "100%"
-gitea_systemd_memory_max: "2G"
-gitea_systemd_io_weight: 100
 
 # =============================================================================
 # LDAP Authentication Sources

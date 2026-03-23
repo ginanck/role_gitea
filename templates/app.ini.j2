@@ -15,7 +15,6 @@ ROOT = {{ gitea_repository_root }}
 DEFAULT_BRANCH = {{ gitea_repository_default_branch }}
 DEFAULT_PRIVATE = {{ gitea_repository_default_private }}
 MAX_CREATION_LIMIT = {{ gitea_repository_max_creation_limit }}
-MIRROR_QUEUE_LENGTH = {{ gitea_repository_mirror_queue_length }}
 FORCE_PRIVATE = {{ gitea_repository_force_private | lower }}
 {% if gitea_repository_disabled_types %}
 DISABLED_REPO_UNITS = {{ gitea_repository_disabled_types }}
@@ -226,6 +225,9 @@ DISABLE_NEW_PULL = {{ gitea_mirror_disable_new_pull | lower }}
 DISABLE_NEW_PUSH = {{ gitea_mirror_disable_new_push | lower }}
 DEFAULT_INTERVAL = {{ gitea_mirror_default_interval }}
 MIN_INTERVAL = {{ gitea_mirror_min_interval }}
+
+[queue.mirror]
+LENGTH = {{ gitea_mirror_queue_length }}
 
 {% if gitea_proxy_enabled %}
 [proxy]

@@ -44,4 +44,4 @@
   environment:
     GITEA_WORK_DIR: "{{ gitea_work_dir }}"
     HOME: "{{ gitea_home_dir }}"
-  no_log: true
+  no_log: false
