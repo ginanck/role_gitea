@@ -1,0 +1,9 @@
+---
+# vars/RedHat.yml — RHEL/AlmaLinux/Rocky specific packages
+
+gitea_os_packages:
+  - git
+  - gnupg2
+  - xz
+  - curl
+  - wget

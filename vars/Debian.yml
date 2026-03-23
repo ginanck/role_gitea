@@ -1,0 +1,9 @@
+---
+# vars/Debian.yml — Debian/Ubuntu specific packages
+
+gitea_os_packages:
+  - git
+  - gnupg2
+  - xz-utils
+  - curl
+  - wget

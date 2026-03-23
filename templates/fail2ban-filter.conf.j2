@@ -1,0 +1,9 @@
+{#- jinja2: lstrip_blocks: true, trim_blocks: true -#}
+# Ansible managed — do not edit manually
+# Fail2ban filter for Gitea
+
+[Definition]
+
+failregex = .*Failed authentication attempt for .* from <HOST>
+
+ignoreregex =

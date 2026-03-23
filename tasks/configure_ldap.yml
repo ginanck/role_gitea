@@ -1,0 +1,88 @@
+---
+# tasks/configure_ldap.yml — Configure LDAP authentication sources via gitea CLI
+
+- name: Flush Handlers to Ensure Gitea Is Running Before LDAP Configuration
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for Gitea Service to Be Ready
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ gitea_server_http_port }}/"
+    method: GET
+    status_code: 200
+  register: gitea_health
+  retries: 10
+  delay: 5
+  until: gitea_health.status == 200
+
+- name: List Existing Authentication Sources
+  ansible.builtin.command:
+    cmd: >-
+      {{ gitea_binary_link_path }}/gitea admin auth list
+      --config {{ gitea_config_path }}
+  register: gitea_auth_list
+  changed_when: false
+  become: true
+  become_user: "{{ gitea_user }}"
+  environment:
+    GITEA_WORK_DIR: "{{ gitea_work_dir }}"
+    HOME: "{{ gitea_home_dir }}"
+
+- name: Configure LDAP Authentication Sources
+  ansible.builtin.command:
+    cmd: >-
+      {{ gitea_binary_link_path }}/gitea admin auth add-{{ item.type | default('ldap') }}
+      --config {{ gitea_config_path }}
+      --name "{{ item.name }}"
+      --host "{{ item.host }}"
+      --port {{ item.port | default(item.encryption | default('disable') == 'ldaps' | ternary(636, 389)) }}
+      --security-protocol {{ item.encryption | default('disable') | replace('disable', 'Unencrypted') | replace('starttls', 'StartTLS') | replace('ldaps', 'LDAPS') }}
+      {% if item.bind_dn is defined and item.type | default('ldap') == 'ldap' %}
+      --bind-dn "{{ item.bind_dn }}"
+      --bind-password "{{ item.bind_password | default('') }}"
+      {% endif %}
+      {% if item.user_dn is defined and item.type | default('ldap') == 'ldap-simple' %}
+      --user-dn "{{ item.user_dn }}"
+      {% endif %}
+      --user-search-base "{{ item.user_search_base | default('') }}"
+      --user-filter "{{ item.user_filter | default('(&(objectClass=posixAccount)(uid=%s))') }}"
+      {% if item.admin_filter is defined %}
+      --admin-filter "{{ item.admin_filter }}"
+      {% endif %}
+      {% if item.restricted_filter is defined %}
+      --restricted-filter "{{ item.restricted_filter }}"
+      {% endif %}
+      --username-attribute "{{ item.username_attribute | default('uid') }}"
+      --firstname-attribute "{{ item.firstname_attribute | default('givenName') }}"
+      --surname-attribute "{{ item.surname_attribute | default('sn') }}"
+      --email-attribute "{{ item.email_attribute | default('mail') }}"
+      {% if item.public_ssh_key_attribute is defined %}
+      --public-ssh-key-attribute "{{ item.public_ssh_key_attribute }}"
+      {% endif %}
+      {% if item.avatar_attribute is defined %}
+      --avatar-attribute "{{ item.avatar_attribute }}"
+      {% endif %}
+      {% if item.skip_tls_verify | default(false) %}
+      --skip-tls-verify
+      {% endif %}
+      {% if item.sync_users | default(false) %}
+      --synchronize-users
+      {% endif %}
+      {% if item.attributes_in_bind is defined and item.attributes_in_bind %}
+      --attributes-in-bind
+      {% endif %}
+      {% if item.skip_local_2fa is defined and item.skip_local_2fa %}
+      --skip-local-2fa
+      {% endif %}
+      {% if not item.active | default(true) %}
+      --not-active
+      {% endif %}
+  loop: "{{ gitea_ldap_sources }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.name not in gitea_auth_list.stdout
+  changed_when: true
+  become: true
+  become_user: "{{ gitea_user }}"
+  environment:
+    GITEA_WORK_DIR: "{{ gitea_work_dir }}"
+    HOME: "{{ gitea_home_dir }}"

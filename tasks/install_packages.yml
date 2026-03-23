@@ -1,0 +1,16 @@
+---
+# tasks/install_packages.yml — Install OS-specific prerequisite packages
+
+- name: Install Prerequisite Packages (Debian)
+  ansible.builtin.apt:
+    name: "{{ gitea_os_packages + gitea_prerequisite_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Install Prerequisite Packages (RedHat)
+  ansible.builtin.dnf:
+    name: "{{ gitea_os_packages + gitea_prerequisite_packages }}"
+    state: present
+  when: ansible_facts['os_family'] == 'RedHat'

@@ -1,0 +1,55 @@
+---
+default_stages: [pre-commit, manual]
+default_install_hook_types: [pre-commit, pre-push, commit-msg, prepare-commit-msg]
+
+repos:
+  - repo: https://github.com/ginanck/shared-pre-commit-hooks
+    rev: v0.30.0
+    hooks:
+      - id: download-configs-ansible
+      - id: gitleaks-commit-history
+      - id: gitleaks-current-directory
+      - id: ripsecrets
+      - id: ansible-lint
+      - id: yamllint
+      - id: flake8
+      - id: black
+      - id: isort
+      - id: hadolint
+      - id: shellcheck
+      - id: docsible
+
+  # General file formatting and validation
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: trailing-whitespace
+        exclude: ^(\.github/.*|roles/.*|collections/.*|meta/.*|todo/.*|ansible/.*|\.ansible/.*|tests/.*|requirements\.yml$|\.pre-commit-*.*\.yaml$|\.travis\.yml$|README\.md$)
+        description: Removes trailing whitespace from the end of lines
+      - id: end-of-file-fixer
+        name: end-of-file-fixer
+        exclude: ^(\.github/.*|roles/.*|collections/.*|meta/.*|todo/.*|ansible/.*|\.ansible/.*|tests/.*|requirements\.yml$|\.pre-commit-*.*\.yaml$|\.travis\.yml$)
+        description: Ensures files end with a single newline character
+      - id: check-added-large-files
+        name: check-added-large-files
+        description: Prevents accidentally committing large files (over 500KB by default)
+        args: ["--maxkb=500"]
+      - id: check-case-conflict
+        name: check-case-conflict
+        description: Checks for files that would conflict in case-insensitive filesystems
+      - id: check-merge-conflict
+        name: check-merge-conflict
+        description: Checks for files containing merge conflict strings
+      - id: check-executables-have-shebangs
+        name: check-executables-have-shebangs
+        description: Ensures executable files have proper shebang lines
+      - id: check-shebang-scripts-are-executable
+        name: check-shebang-scripts-are-executable
+        exclude: \.j2$
+        description: Ensures files with shebangs are marked as executable
+      - id: mixed-line-ending
+        name: mixed-line-ending
+        exclude: ^(\.github/.*|roles/.*|collections/.*|meta/.*|todo/.*|ansible/.*|\.ansible/.*|tests/.*|requirements\.yml$|\.pre-commit-*.*\.yaml$|\.travis\.yml$)
+        description: Replaces mixed line endings with Unix-style (LF) line endings
+        args: ["--fix=lf"]

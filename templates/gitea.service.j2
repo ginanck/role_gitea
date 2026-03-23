@@ -1,0 +1,30 @@
+{#- jinja2: lstrip_blocks: true, trim_blocks: true -#}
+# Ansible managed — do not edit manually
+
+[Unit]
+Description=Gitea (Git with a cup of tea)
+After=network.target
+{% if gitea_db_type == 'mysql' %}
+Wants=mysqld.service
+After=mysqld.service
+{% elif gitea_db_type == 'postgres' %}
+Wants=postgresql.service
+After=postgresql.service
+{% endif %}
+
+[Service]
+RestartSec=2s
+Type=simple
+User={{ gitea_user }}
+Group={{ gitea_group }}
+WorkingDirectory={{ gitea_work_dir }}
+ExecStart={{ gitea_binary_link_path }}/gitea web --config {{ gitea_config_path }}
+Restart=always
+Environment=USER={{ gitea_user }} HOME={{ gitea_home_dir }} GITEA_WORK_DIR={{ gitea_work_dir }}
+{% if gitea_systemd_cap_net_bind_service %}
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+{% endif %}
+
+[Install]
+WantedBy=multi-user.target

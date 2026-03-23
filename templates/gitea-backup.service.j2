@@ -1,0 +1,15 @@
+{#- jinja2: lstrip_blocks: true, trim_blocks: true -#}
+# Ansible managed — do not edit manually
+
+[Unit]
+Description=Gitea Backup
+After=gitea.service
+
+[Service]
+Type=oneshot
+User={{ gitea_user }}
+Group={{ gitea_group }}
+ExecStart={{ gitea_binary_link_path }}/gitea dump --config {{ gitea_config_path }} --file {{ gitea_backup_dir }}/gitea-backup-%%Y%%m%%d-%%H%%M%%S.{{ gitea_backup_type }} --type {{ gitea_backup_type }}
+WorkingDirectory={{ gitea_tmp_dir }}
+Environment=HOME={{ gitea_home_dir }}
+Environment=GITEA_WORK_DIR={{ gitea_work_dir }}

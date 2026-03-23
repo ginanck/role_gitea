@@ -1,0 +1,12 @@
+{#- jinja2: lstrip_blocks: true, trim_blocks: true -#}
+# Ansible managed — do not edit manually
+# Fail2ban jail for Gitea
+
+[gitea]
+enabled = true
+filter = gitea
+logpath = {{ gitea_log_dir }}/gitea.log
+maxretry = {{ gitea_fail2ban_maxretry }}
+findtime = {{ gitea_fail2ban_findtime }}
+bantime = {{ gitea_fail2ban_bantime }}
+action = {{ gitea_fail2ban_action }}

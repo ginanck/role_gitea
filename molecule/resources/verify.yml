@@ -1,0 +1,63 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Check Gitea Binary Exists
+      ansible.builtin.stat:
+        path: /usr/local/bin/gitea
+      register: gitea_binary
+
+    - name: Assert Gitea Binary Is Present
+      ansible.builtin.assert:
+        that:
+          - gitea_binary.stat.exists
+          - gitea_binary.stat.islnk
+        fail_msg: "Gitea binary not found at /usr/local/bin/gitea"
+
+    - name: Check Gitea Configuration Exists
+      ansible.builtin.stat:
+        path: /etc/gitea/app.ini
+      register: gitea_config
+
+    - name: Assert Gitea Configuration Is Present
+      ansible.builtin.assert:
+        that:
+          - gitea_config.stat.exists
+        fail_msg: "Gitea configuration not found at /etc/gitea/app.ini"
+
+    - name: Check Gitea Service Is Running
+      ansible.builtin.command: systemctl is-active gitea
+      register: gitea_service_status
+      changed_when: false
+      failed_when: false
+
+    - name: Assert Gitea Service Is Active
+      ansible.builtin.assert:
+        that:
+          - gitea_service_status.rc == 0
+        fail_msg: "Gitea service is not active"
+
+    - name: Check Gitea User Exists
+      ansible.builtin.command: id gitea
+      register: gitea_user_check
+      changed_when: false
+
+    - name: Assert Gitea User Exists
+      ansible.builtin.assert:
+        that:
+          - gitea_user_check.rc == 0
+        fail_msg: "Gitea system user does not exist"
+
+    - name: Check Gitea Data Directory Exists
+      ansible.builtin.stat:
+        path: /var/lib/gitea
+      register: gitea_data_dir
+
+    - name: Assert Gitea Data Directory Is Present
+      ansible.builtin.assert:
+        that:
+          - gitea_data_dir.stat.exists
+          - gitea_data_dir.stat.isdir
+        fail_msg: "Gitea data directory not found at /var/lib/gitea"

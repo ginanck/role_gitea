@@ -1,0 +1,47 @@
+---
+# tasks/create_admin_user.yml — Create Gitea admin user via CLI
+
+- name: Flush Handlers to Ensure Gitea Is Running Before Admin User Creation
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for Gitea Service to Be Ready
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ gitea_server_http_port }}/"
+    method: GET
+    status_code: 200
+  register: gitea_health_admin
+  retries: 10
+  delay: 5
+  until: gitea_health_admin.status == 200
+
+- name: Check If Admin User Already Exists
+  ansible.builtin.command:
+    cmd: >-
+      {{ gitea_binary_link_path }}/gitea admin user list
+      --config {{ gitea_config_path }}
+  register: gitea_user_list
+  changed_when: false
+  become: true
+  become_user: "{{ gitea_user }}"
+  environment:
+    GITEA_WORK_DIR: "{{ gitea_work_dir }}"
+    HOME: "{{ gitea_home_dir }}"
+
+- name: Create Gitea Admin User
+  ansible.builtin.command:
+    cmd: >-
+      {{ gitea_binary_link_path }}/gitea admin user create
+      --config {{ gitea_config_path }}
+      --username "{{ gitea_admin_user.username }}"
+      --password "{{ gitea_admin_user.password }}"
+      --email "{{ gitea_admin_user.email }}"
+      --admin
+      --must-change-password=false
+  when: gitea_admin_user.username not in gitea_user_list.stdout
+  changed_when: true
+  become: true
+  become_user: "{{ gitea_user }}"
+  environment:
+    GITEA_WORK_DIR: "{{ gitea_work_dir }}"
+    HOME: "{{ gitea_home_dir }}"
+  no_log: false

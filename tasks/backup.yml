@@ -1,0 +1,45 @@
+---
+# tasks/backup.yml — Configure scheduled backups via systemd timer
+
+- name: Deploy Gitea Backup Service Unit
+  ansible.builtin.template:
+    src: gitea-backup.service.j2
+    dest: /etc/systemd/system/gitea-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd
+
+- name: Deploy Gitea Backup Timer Unit
+  ansible.builtin.template:
+    src: gitea-backup.timer.j2
+    dest: /etc/systemd/system/gitea-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd
+
+- name: Flush Handlers to Reload Systemd Before Timer Start
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and Start Gitea Backup Timer
+  ansible.builtin.systemd:
+    name: gitea-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Clean Old Backups
+  ansible.builtin.command:
+    cmd: "find {{ gitea_backup_dir }} -name 'gitea-backup-*' -mtime +{{ gitea_backup_retention_days }} -type f"
+  register: gitea_old_backups
+  changed_when: false
+
+- name: Remove Expired Backup Files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ gitea_old_backups.stdout_lines }}"
+  loop_control:
+    label: "{{ item | basename }}"
+  when: gitea_old_backups.stdout_lines | length > 0
