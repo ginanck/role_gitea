@@ -95,6 +95,8 @@ gitea_db_log_sql: false
 
 gitea_secret_key: ""
 gitea_internal_token: ""
+gitea_secrets_file: "{{ gitea_config_dir }}/.secrets.yml"
+gitea_force_regenerate_secrets: false
 gitea_install_lock: true
 gitea_disable_git_hooks: true
 gitea_password_complexity: "off"

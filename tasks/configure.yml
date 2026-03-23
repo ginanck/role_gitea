@@ -1,6 +1,11 @@
 ---
 # tasks/configure.yml — Deploy Gitea app.ini configuration
 
+- name: Check If Gitea Configuration Already Exists
+  ansible.builtin.stat:
+    path: "{{ gitea_config_path }}"
+  register: _gitea_config_stat
+
 - name: Deploy Gitea Configuration
   block:
     - name: Back Up Current Configuration
@@ -12,7 +17,7 @@
         group: "{{ gitea_group }}"
         mode: "0640"
       changed_when: false
-      when: gitea_config_stat.stat.exists is defined and gitea_config_stat.stat.exists
+      when: _gitea_config_stat.stat.exists
 
     - name: Deploy Gitea app.ini Configuration File
       ansible.builtin.template:
@@ -31,7 +36,7 @@
         owner: "{{ gitea_user }}"
         group: "{{ gitea_group }}"
         mode: "0640"
-      when: gitea_config_stat.stat.exists is defined and gitea_config_stat.stat.exists
+      when: _gitea_config_stat.stat.exists
 
     - name: Log Configuration Deployment Failure
       ansible.builtin.debug:
