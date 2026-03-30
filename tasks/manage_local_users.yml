@@ -32,15 +32,15 @@
     cmd: >-
       {{ gitea_binary_link_path }}/gitea admin user create
       --config {{ gitea_config_path }}
-      --username "{{ item.name }}"
+      --username "{{ item.username }}"
       --password "{{ item.password }}"
       --email "{{ item.email }}"
       {% if item.admin | default(false) %}--admin{% endif %}
       --must-change-password={{ item.must_change_password | default(true) | lower }}
   loop: "{{ gitea_local_users | selectattr('state', 'undefined') | list + gitea_local_users | selectattr('state', 'defined') | selectattr('state', 'equalto', 'present') | list }}"
   loop_control:
-    label: "{{ item.name }}"
-  when: item.name not in gitea_existing_users.stdout
+    label: "{{ item.username }}"
+  when: item.username not in gitea_existing_users.stdout
   changed_when: true
   become: true
   become_user: "{{ gitea_user }}"
@@ -54,11 +54,11 @@
     cmd: >-
       {{ gitea_binary_link_path }}/gitea admin user delete
       --config {{ gitea_config_path }}
-      --username "{{ item.name }}"
+      --username "{{ item.username }}"
   loop: "{{ gitea_local_users | selectattr('state', 'defined') | selectattr('state', 'equalto', 'absent') | list }}"
   loop_control:
-    label: "{{ item.name }}"
-  when: item.name in gitea_existing_users.stdout
+    label: "{{ item.username }}"
+  when: item.username in gitea_existing_users.stdout
   changed_when: true
   become: true
   become_user: "{{ gitea_user }}"
