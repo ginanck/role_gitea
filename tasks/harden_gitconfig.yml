@@ -1,0 +1,73 @@
+---
+# tasks/harden_gitconfig.yml — Detect and quarantine a poisoned Gitea .gitconfig
+#
+# Background: Gitea's `add-logger` internal API has had injection bugs that let
+# an attacker write `packObjectsHook = sh <payload>` into ~gitea/.gitconfig,
+# giving RCE as the gitea user. Gitea rewrites its default .gitconfig on start,
+# so removing a poisoned file is safe. Runs BEFORE the binary upgrade so a
+# crash-looping instance can recover.
+
+- name: Find All gitconfig Files Under Gitea Data Dir
+  ansible.builtin.command:
+    cmd: >-
+      find {{ gitea_data_dir }}
+      -type f -name .gitconfig
+  register: gitea_gitconfig_files
+  changed_when: false
+  check_mode: false
+
+- name: Detect Poisoned gitconfig Files
+  ansible.builtin.command:
+    cmd: >-
+      grep -lE
+      "packObjectsHook|p0_[0-9a-f]{8}|/tmp/g[0-9]+_"
+      {{ item }}
+  register: gitea_gitconfig_poisoned
+  changed_when: false
+  failed_when: gitea_gitconfig_poisoned.rc not in [0, 1]
+  check_mode: false
+  loop: "{{ gitea_gitconfig_files.stdout_lines }}"
+
+- name: Compute Poisoned gitconfig Paths
+  ansible.builtin.set_fact:
+    gitea_poisoned_paths: >-
+      {{ gitea_gitconfig_poisoned.results
+         | selectattr('rc', 'equalto', 0)
+         | map(attribute='item') | list }}
+
+- name: Quarantine Poisoned Gitea gitconfig
+  when: gitea_poisoned_paths | length > 0
+  block:
+    - name: Move Poisoned gitconfig Aside
+      ansible.builtin.command:
+        cmd: >-
+          mv {{ item }}
+             {{ item }}.poisoned-{{ ansible_date_time.iso8601_basic_short }}
+      loop: "{{ gitea_poisoned_paths }}"
+      changed_when: true
+      notify: restart gitea
+
+    - name: Find Attacker Payload Scripts
+      ansible.builtin.find:
+        paths: "{{ gitea_data_dir }}"
+        patterns: "p0_*.sh"
+        recurse: true
+      register: gitea_payload_scripts
+
+    - name: Delete Attacker Payload Scripts
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ gitea_payload_scripts.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Warn Operator About Poisoning
+      ansible.builtin.debug:
+        msg: >-
+          Poisoned .gitconfig detected on {{ inventory_hostname }} — quarantined
+          {{ gitea_poisoned_paths }} to *.poisoned-* and removed payload
+          scripts. Investigate {{ gitea_data_dir }}/.bash_history and rotate
+          INTERNAL_TOKEN / SECRET_KEY / LFS_JWT_SECRET / OAUTH2_JWT_SECRET
+          manually. Consider wiping
+          {{ gitea_session_provider_config | default(gitea_data_dir + '/sessions') }}/*.

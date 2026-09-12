@@ -1,0 +1,68 @@
+---
+# tasks/harden_firewall.yml — Restrict Gitea backend ports to the edge LB.
+#
+# role_base stops+masks firewalld/ufw. This task deliberately re-enables it
+# only on the gitea host so that the gitea HTTP and SSH ports are reachable
+# only from the load balancer(s) in gitea_allowed_source_ips. Host SSH (:22)
+# is left open via the standard 'ssh' service so we don't lock ourselves out.
+#
+# Loopback (127.0.0.1) is always accepted by firewalld's 'trusted' zone on lo,
+# so Ansible's on-host health check (http://127.0.0.1:3000/) is unaffected.
+
+- name: Harden Firewall On Gitea Host (RedHat)
+  when: ansible_facts['os_family'] == 'RedHat'
+  block:
+    - name: Install firewalld
+      ansible.builtin.package:
+        name: firewalld
+        state: present
+
+    - name: Unmask firewalld
+      ansible.builtin.systemd:
+        name: firewalld
+        masked: false
+
+    - name: Enable And Start firewalld
+      ansible.builtin.systemd:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Ensure Host SSH Stays Allowed Before Locking Down
+      ansible.posix.firewalld:
+        service: ssh
+        state: enabled
+        permanent: true
+        immediate: true
+        zone: public
+
+    - name: Remove Any Wildcard Openings For Gitea Ports
+      ansible.posix.firewalld:
+        port: "{{ item }}/tcp"
+        state: disabled
+        permanent: true
+        immediate: true
+        zone: public
+      loop:
+        - "{{ gitea_server_http_port }}"
+        - "{{ gitea_server_ssh_port }}"
+
+    - name: Allow Gitea Backend Ports Only From Load Balancer Sources
+      ansible.posix.firewalld:
+        rich_rule: >-
+          rule family=ipv4 source address={{ item.0 }}
+          port protocol=tcp port={{ item.1 }} accept
+        state: enabled
+        permanent: true
+        immediate: true
+        zone: public
+      loop: "{{ gitea_allowed_source_ips | product([gitea_server_http_port, gitea_server_ssh_port]) | list }}"
+      loop_control:
+        label: "{{ item.0 }} → :{{ item.1 }}"
+
+- name: Warn On Debian (firewalld path only, ufw not implemented)
+  ansible.builtin.debug:
+    msg: >-
+      Debian host detected — firewalld hardening path is RedHat-only.
+      Add ufw rules manually or extend harden_firewall.yml.
+  when: ansible_facts['os_family'] == 'Debian'

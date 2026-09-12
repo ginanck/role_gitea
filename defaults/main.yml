@@ -6,7 +6,7 @@
 # Core Configuration
 # =============================================================================
 
-gitea_version: "1.23.4"
+gitea_version: "1.27.3"
 gitea_user: gitea
 gitea_group: gitea
 gitea_shell: /bin/bash

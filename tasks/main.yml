@@ -20,6 +20,9 @@
 - name: Create Gitea Directories
   ansible.builtin.include_tasks: create_directories.yml
 
+- name: Quarantine Poisoned Gitea gitconfig If Present
+  ansible.builtin.include_tasks: harden_gitconfig.yml
+
 - name: Download and Install Gitea Binary
   ansible.builtin.include_tasks: install_gitea.yml
 
@@ -31,6 +34,10 @@
 
 - name: Deploy Gitea Systemd Service
   ansible.builtin.include_tasks: install_systemd.yml
+
+- name: Harden Gitea Host Firewall
+  ansible.builtin.include_tasks: harden_firewall.yml
+  tags: [gitea, harden, firewall]
 
 - name: Deploy Custom Branding and Themes
   ansible.builtin.include_tasks: customize.yml
