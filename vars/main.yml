@@ -12,3 +12,13 @@ gitea_arch: "{{ gitea_arch_map[ansible_facts['architecture']] | default('amd64')
 
 # GPG key fingerprint for Gitea release signing
 gitea_gpg_key_fingerprint: "7C9E68152594688862D62AF62D9AE806EC1592E2"
+
+# TLS is active when the operator enables it directly or sets the legacy
+# gitea_server_protocol variable to https.
+gitea_tls_active: "{{ gitea_tls_enabled | bool or gitea_server_protocol == 'https' }}"
+
+# Ports opened to gitea_allowed_source_ips. The redirect listener is only
+# relevant when TLS is active and HTTP redirect is enabled.
+gitea_firewall_ports: >-
+  {{ [gitea_server_http_port | int, gitea_server_ssh_port | int]
+     + ([gitea_server_redirect_http_port | int] if (gitea_tls_active | bool and gitea_server_redirect_http | bool) else []) }}

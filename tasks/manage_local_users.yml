@@ -6,9 +6,10 @@
 
 - name: Wait for Gitea Service to Be Ready
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ gitea_server_http_port }}/"
+    url: "{{ gitea_server_protocol }}://127.0.0.1:{{ gitea_server_http_port }}/"
     method: GET
     status_code: 200
+    validate_certs: false
   register: gitea_health_users
   retries: 10
   delay: 5

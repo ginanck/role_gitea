@@ -7,3 +7,5 @@ gitea_os_packages:
   - xz
   - curl
   - wget
+  - unzip
+  - findutils

@@ -1,63 +1,379 @@
 ---
 - name: Verify
   hosts: all
-  gather_facts: false
   become: true
+  gather_facts: true
+  vars:
+    gitea_server_domain: localhost
+    gitea_tls_enabled: true
+    gitea_server_redirect_http: true
+    gitea_server_redirect_http_port: 3001
+    gitea_binary_link_path: /usr/local/bin
+    gitea_config_path: /etc/gitea/app.ini
+    molecule_admin_user: gitea_admin
+    molecule_admin_password: molecule-admin-S3cret
   tasks:
-    - name: Check Gitea Binary Exists
-      ansible.builtin.stat:
-        path: /usr/local/bin/gitea
-      register: gitea_binary
+    # ---------------------------------------------------------------------
+    # AC-1 — Gitea terminates TLS itself and the certificate chains to the CA
+    # ---------------------------------------------------------------------
+    - name: test_ac1_service_is_running
+      ansible.builtin.command:
+        cmd: systemctl is-active gitea
+      changed_when: false
+      register: gitea_active
 
-    - name: Assert Gitea Binary Is Present
+    - name: test_ac1_assert_service_state
       ansible.builtin.assert:
         that:
-          - gitea_binary.stat.exists
-          - gitea_binary.stat.islnk
-        fail_msg: "Gitea binary not found at /usr/local/bin/gitea"
+          - gitea_active.stdout | trim == 'active'
+        fail_msg: "Gitea must be running"
 
-    - name: Check Gitea Configuration Exists
-      ansible.builtin.stat:
-        path: /etc/gitea/app.ini
+    - name: test_ac1_https_listener_serves_gitea
+      ansible.builtin.uri:
+        url: "https://127.0.0.1:3000/api/v1/version"
+        method: GET
+        status_code: 200
+        validate_certs: false
+
+    - name: test_ac1_certificate_chains_to_internal_ca
+      ansible.builtin.shell:
+        cmd: >-
+          openssl s_client -connect 127.0.0.1:3000 -servername localhost
+          -CAfile /var/tmp/gitea-tls/ca.crt -verify_return_error </dev/null
+        executable: /bin/sh
+      register: gitea_tls_chain
+      changed_when: false
+
+    - name: test_ac1_assert_ca_chain
+      ansible.builtin.assert:
+        that:
+          - "'Verify return code: 0 (ok)' in gitea_tls_chain.stdout"
+        fail_msg: "The served certificate must chain to the internal CA"
+
+    - name: test_ac1_configuration_declares_tls
+      ansible.builtin.slurp:
+        src: /etc/gitea/app.ini
       register: gitea_config
 
-    - name: Assert Gitea Configuration Is Present
+    - name: test_ac1_assert_protocol_and_certificate_paths
       ansible.builtin.assert:
         that:
-          - gitea_config.stat.exists
-        fail_msg: "Gitea configuration not found at /etc/gitea/app.ini"
+          - "'PROTOCOL = https' in (gitea_config.content | b64decode)"
+          - "'CERT_FILE = /etc/gitea/ssl/localhost.crt' in (gitea_config.content | b64decode)"
+          - "'KEY_FILE = /etc/gitea/ssl/localhost.key' in (gitea_config.content | b64decode)"
+        fail_msg: "PROTOCOL=https and both certificate paths must be rendered"
 
-    - name: Check Gitea Service Is Running
-      ansible.builtin.command: systemctl is-active gitea
-      register: gitea_service_status
+    - name: test_ac1_certificate_pair_modes
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /etc/gitea/ssl/localhost.crt
+        - /etc/gitea/ssl/localhost.key
+      register: gitea_tls_files
+
+    - name: test_ac1_assert_certificate_pair_modes
+      ansible.builtin.assert:
+        that:
+          - gitea_tls_files.results[0].stat.exists
+          - gitea_tls_files.results[0].stat.mode == '0644'
+          - gitea_tls_files.results[1].stat.exists
+          - gitea_tls_files.results[1].stat.mode == '0640'
+        fail_msg: "The certificate must be 0644 and the private key 0640"
+
+    # ---------------------------------------------------------------------
+    # AC-2 — Plain HTTP redirects to HTTPS
+    # ---------------------------------------------------------------------
+    - name: test_ac2_http_redirects_to_https
+      ansible.builtin.command:
+        cmd: >-
+          curl -sS -o /dev/null -w '%{http_code} %{redirect_url}'
+          http://127.0.0.1:3001/
       changed_when: false
+      register: gitea_redirect
+
+    - name: test_ac2_assert_redirect_to_https
+      ansible.builtin.assert:
+        that:
+          - gitea_redirect.stdout.split(' ')[0] is match('30[1278]')
+          - "'https://' in gitea_redirect.stdout"
+        fail_msg: "Plain HTTP must redirect to HTTPS"
+
+    - name: test_ac2_assert_redirect_configuration
+      ansible.builtin.assert:
+        that:
+          - "'REDIRECT_OTHER_PORT = true' in (gitea_config.content | b64decode)"
+          - "'PORT_TO_REDIRECT = 3001' in (gitea_config.content | b64decode)"
+        fail_msg: "The redirect listener must be configured"
+
+    # ---------------------------------------------------------------------
+    # AC-4 — Firewall defaults are defined and applied on the RHEL family
+    # ---------------------------------------------------------------------
+    - name: test_ac4_firewall_is_running
+      ansible.builtin.command:
+        cmd: systemctl is-active firewalld
+      changed_when: false
+      register: gitea_firewalld
+
+    - name: test_ac4_assert_firewall_is_running
+      ansible.builtin.assert:
+        that:
+          - gitea_firewalld.stdout | trim == 'active'
+        fail_msg: "firewalld must be active on the Gitea host"
+
+    - name: test_ac4_default_source_list_is_applied_to_gitea_ports
+      ansible.builtin.command:
+        argv:
+          - firewall-cmd
+          - "--query-rich-rule=rule family=ipv4 source address=127.0.0.1/32 port port={{ item }} protocol=tcp accept"
+      loop:
+        - "3000"
+        - "3001"
+        - "22"
+      register: gitea_firewall_rules
+      changed_when: false
+
+    - name: test_ac4_assert_default_source_rules
+      ansible.builtin.assert:
+        that:
+          - item.rc == 0
+        fail_msg: >-
+          The default source list must allow 127.0.0.1/32 to every Gitea port
+      loop: "{{ gitea_firewall_rules.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    # ---------------------------------------------------------------------
+    # AC-5 — The admin password is never written to output or configuration
+    # ---------------------------------------------------------------------
+    - name: test_ac5_locate_controller_run_log
+      ansible.builtin.stat:
+        path: "{{ lookup('env', 'ANSIBLE_LOG_PATH') }}"
+      delegate_to: localhost
+      become: false
+      register: gitea_run_log
       failed_when: false
 
-    - name: Assert Gitea Service Is Active
+    - name: test_ac5_assert_controller_run_log_exists
       ansible.builtin.assert:
         that:
-          - gitea_service_status.rc == 0
-        fail_msg: "Gitea service is not active"
+          - gitea_run_log.stat.exists
+        fail_msg: >-
+          ANSIBLE_LOG_PATH must point at the logged converge run so the
+          password can be searched for in the actual output
 
-    - name: Check Gitea User Exists
-      ansible.builtin.command: id gitea
-      register: gitea_user_check
-      changed_when: false
+    - name: test_ac5_read_controller_run_log
+      ansible.builtin.slurp:
+        src: "{{ lookup('env', 'ANSIBLE_LOG_PATH') }}"
+      delegate_to: localhost
+      become: false
+      register: gitea_run_log_content
 
-    - name: Assert Gitea User Exists
+    - name: test_ac5_assert_password_absent_from_output
       ansible.builtin.assert:
         that:
-          - gitea_user_check.rc == 0
-        fail_msg: "Gitea system user does not exist"
+          - molecule_admin_password not in (gitea_run_log_content.content | b64decode)
+        fail_msg: "The admin password must never appear in task output"
 
-    - name: Check Gitea Data Directory Exists
+    - name: test_ac5_assert_password_absent_from_configuration
+      ansible.builtin.assert:
+        that:
+          - molecule_admin_password not in (gitea_config.content | b64decode)
+        fail_msg: "The admin password must not be rendered into app.ini"
+
+    - name: test_ac5_temporary_password_file_removed
       ansible.builtin.stat:
-        path: /var/lib/gitea
-      register: gitea_data_dir
+        path: /etc/gitea/.gitea-admin-password
+      register: gitea_admin_password_file
 
-    - name: Assert Gitea Data Directory Is Present
+    - name: test_ac5_assert_temporary_password_file_removed
       ansible.builtin.assert:
         that:
-          - gitea_data_dir.stat.exists
-          - gitea_data_dir.stat.isdir
-        fail_msg: "Gitea data directory not found at /var/lib/gitea"
+          - not gitea_admin_password_file.stat.exists
+        fail_msg: "The temporary admin password file must be removed"
+
+    # ---------------------------------------------------------------------
+    # AC-6 — The second run is idempotent; no temporary credentials remain
+    # ---------------------------------------------------------------------
+    - name: test_ac6_backup_service_uses_gitea_dump
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/gitea-backup.service
+      register: gitea_backup_service
+
+    - name: test_ac6_assert_backup_includes_database
+      ansible.builtin.assert:
+        that:
+          - "'gitea dump' in (gitea_backup_service.content | b64decode)"
+        fail_msg: "The backup unit must use gitea dump so the database is included"
+
+    - name: test_ac6_assert_second_run_left_no_credentials
+      ansible.builtin.assert:
+        that:
+          - not gitea_admin_password_file.stat.exists
+        fail_msg: "A second run must leave no temporary credential behind"
+
+    # ---------------------------------------------------------------------
+    # AC-7 — Backup and restore reproduce users, repositories and settings
+    # ---------------------------------------------------------------------
+    - name: test_ac7_create_fixture_user
+      ansible.builtin.command:
+        cmd: >-
+          {{ gitea_binary_link_path }}/gitea admin user create
+          --config {{ gitea_config_path }}
+          --username restoreuser
+          --password restore-fixture-S3cret
+          --email restoreuser@example.com
+          --must-change-password=false
+      become: true
+      become_user: gitea
+      environment:
+        GITEA_WORK_DIR: /var/lib/gitea
+        HOME: /var/lib/gitea
+      changed_when: true
+      no_log: true
+
+    - name: test_ac7_create_fixture_repository
+      ansible.builtin.uri:
+        url: "https://127.0.0.1:3000/api/v1/admin/users/restoreuser/repos"
+        method: POST
+        user: "{{ molecule_admin_user }}"
+        password: "{{ molecule_admin_password }}"
+        force_basic_auth: true
+        body_format: json
+        body:
+          name: restore-fixture
+          auto_init: true
+          private: true
+        validate_certs: false
+        status_code: 201
+      no_log: true
+
+    - name: test_ac7_remove_stale_archive
+      ansible.builtin.file:
+        path: /var/tmp/gitea-restore-fixture.zip
+        state: absent
+
+    - name: test_ac7_take_backup_with_database_dump
+      ansible.builtin.command:
+        cmd: >-
+          {{ gitea_binary_link_path }}/gitea dump
+          --config {{ gitea_config_path }}
+          --file /var/tmp/gitea-restore-fixture.zip
+          --type zip
+          --quiet
+      become: true
+      become_user: gitea
+      environment:
+        GITEA_WORK_DIR: /var/lib/gitea
+        HOME: /var/lib/gitea
+      changed_when: true
+
+    - name: test_ac7_archive_contains_database_dump
+      ansible.builtin.command:
+        cmd: unzip -l /var/tmp/gitea-restore-fixture.zip
+      changed_when: false
+      register: gitea_archive_listing
+
+    - name: test_ac7_assert_archive_has_database_dump
+      ansible.builtin.assert:
+        that:
+          - "'gitea-db.sql' in gitea_archive_listing.stdout"
+        fail_msg: "The backup archive must contain gitea-db.sql"
+
+    - name: test_ac7_delete_fixture_repository
+      ansible.builtin.uri:
+        url: "https://127.0.0.1:3000/api/v1/repos/restoreuser/restore-fixture"
+        method: DELETE
+        user: "{{ molecule_admin_user }}"
+        password: "{{ molecule_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 204
+      no_log: true
+
+    - name: test_ac7_delete_fixture_user
+      ansible.builtin.command:
+        cmd: >-
+          {{ gitea_binary_link_path }}/gitea admin user delete
+          --config {{ gitea_config_path }}
+          --username restoreuser
+      become: true
+      become_user: gitea
+      environment:
+        GITEA_WORK_DIR: /var/lib/gitea
+        HOME: /var/lib/gitea
+      changed_when: true
+      no_log: true
+
+    - name: test_ac7_assert_fixture_removed_before_restore
+      ansible.builtin.command:
+        cmd: >-
+          {{ gitea_binary_link_path }}/gitea admin user list
+          --config {{ gitea_config_path }}
+      become: true
+      become_user: gitea
+      environment:
+        GITEA_WORK_DIR: /var/lib/gitea
+        HOME: /var/lib/gitea
+      changed_when: false
+      register: gitea_users_before_restore
+
+    - name: test_ac7_assert_user_gone_before_restore
+      ansible.builtin.assert:
+        that:
+          - "'restoreuser' not in gitea_users_before_restore.stdout"
+        fail_msg: "The fixture user must be removed before the restore"
+
+    - name: test_ac7_restore_from_archive
+      ansible.builtin.include_role:
+        name: role_gitea
+        tasks_from: restore
+      vars:
+        gitea_restore_archive: /var/tmp/gitea-restore-fixture.zip
+        gitea_restore_force: true
+
+    - name: test_ac7_assert_user_restored
+      ansible.builtin.command:
+        cmd: >-
+          {{ gitea_binary_link_path }}/gitea admin user list
+          --config {{ gitea_config_path }}
+      become: true
+      become_user: gitea
+      environment:
+        GITEA_WORK_DIR: /var/lib/gitea
+        HOME: /var/lib/gitea
+      changed_when: false
+      register: gitea_users_after_restore
+
+    - name: test_ac7_assert_users_present_after_restore
+      ansible.builtin.assert:
+        that:
+          - "'restoreuser' in gitea_users_after_restore.stdout"
+        fail_msg: "Restore must reproduce the user table"
+
+    - name: test_ac7_assert_repository_restored
+      ansible.builtin.uri:
+        url: "https://127.0.0.1:3000/api/v1/repos/restoreuser/restore-fixture"
+        method: GET
+        user: "{{ molecule_admin_user }}"
+        password: "{{ molecule_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+      no_log: true
+
+    - name: test_ac7_assert_settings_restored
+      ansible.builtin.slurp:
+        src: /etc/gitea/app.ini
+      register: gitea_config_after_restore
+
+    - name: test_ac7_assert_restored_configuration
+      ansible.builtin.assert:
+        that:
+          - "'PROTOCOL = https' in (gitea_config_after_restore.content | b64decode)"
+          - "'APP_NAME' in (gitea_config_after_restore.content | b64decode)"
+        fail_msg: "Restore must reproduce app.ini settings"
+
+    - name: test_ac7_cleanup_fixture_archive
+      ansible.builtin.file:
+        path: /var/tmp/gitea-restore-fixture.zip
+        state: absent

@@ -1,0 +1,68 @@
+---
+- name: Side effect
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    gitea_tls_fixture_dir: >-
+      {{ (lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') or '/tmp/gitea-molecule')
+         ~ '/tls' }}
+    gitea_server_domain: localhost
+  tasks:
+    # ---------------------------------------------------------------------
+    # AC-3 — With TLS disabled the instance serves plain HTTP
+    # ---------------------------------------------------------------------
+    - name: test_ac3_apply_role_with_tls_disabled
+      ansible.builtin.include_role:
+        name: role_gitea
+      vars:
+        gitea_tls_enabled: false
+        gitea_server_redirect_http: false
+        gitea_tls_certificate_src: ""
+        gitea_tls_key_src: ""
+
+    - name: test_ac3_plain_http_is_served
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:3000/api/v1/version"
+        method: GET
+        status_code: 200
+
+    - name: test_ac3_read_plain_http_configuration
+      ansible.builtin.slurp:
+        src: /etc/gitea/app.ini
+      register: gitea_plain_config
+
+    - name: test_ac3_assert_plain_http_configuration
+      ansible.builtin.assert:
+        that:
+          - "'PROTOCOL = http' in (gitea_plain_config.content | b64decode)"
+          - "'CERT_FILE' not in (gitea_plain_config.content | b64decode)"
+          - "'REDIRECT_OTHER_PORT' not in (gitea_plain_config.content | b64decode)"
+        fail_msg: "TLS-disabled mode must serve plain HTTP without certificate fields"
+
+    - name: test_ac3_readme_documents_proxy_requirement
+      ansible.builtin.assert:
+        that:
+          - "'reverse proxy is required' in (lookup('file', playbook_dir ~ '/../../README.md') | lower)"
+        fail_msg: "The README must state the reverse proxy requirement when TLS is disabled"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    # Restore the TLS-enabled state so the verify play sees the primary mode.
+    - name: test_ac3_restore_tls_enabled_state
+      ansible.builtin.include_role:
+        name: role_gitea
+      vars:
+        gitea_tls_enabled: true
+        gitea_server_redirect_http: true
+        gitea_server_redirect_http_port: 3001
+        gitea_tls_certificate_src: "{{ gitea_tls_fixture_dir }}/server.crt"
+        gitea_tls_key_src: "{{ gitea_tls_fixture_dir }}/server.key"
+
+    - name: test_ac3_tls_is_served_again
+      ansible.builtin.uri:
+        url: "https://127.0.0.1:3000/api/v1/version"
+        method: GET
+        status_code: 200
+        validate_certs: false

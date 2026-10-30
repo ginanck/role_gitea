@@ -29,26 +29,35 @@
 - name: Generate Gitea Secrets
   ansible.builtin.include_tasks: generate_secrets.yml
 
+- name: Deploy Gitea TLS Certificate Pair
+  ansible.builtin.include_tasks: deploy_certificates.yml
+  when: gitea_tls_active | bool
+
 - name: Deploy Gitea Configuration
   ansible.builtin.include_tasks: configure.yml
 
 - name: Deploy Gitea Systemd Service
   ansible.builtin.include_tasks: install_systemd.yml
 
+- name: Restore Gitea From an Archive
+  ansible.builtin.include_tasks: restore.yml
+  when: gitea_restore_enabled | bool
+
 - name: Harden Gitea Host Firewall
   ansible.builtin.include_tasks: harden_firewall.yml
+  when: gitea_firewall_enabled | bool
   tags: [gitea, harden, firewall]
 
 - name: Deploy Custom Branding and Themes
   ansible.builtin.include_tasks: customize.yml
   when: >-
-    gitea_custom_logo_svg or gitea_custom_logo_png or
-    gitea_custom_favicon_svg or gitea_custom_favicon_png or
-    gitea_custom_apple_touch_icon or
-    gitea_custom_footer_template or
-    gitea_custom_themes | length > 0 or
-    gitea_custom_public_files_src or
-    gitea_custom_templates_src
+    (gitea_custom_logo_svg or gitea_custom_logo_png or
+     gitea_custom_favicon_svg or gitea_custom_favicon_png or
+     gitea_custom_apple_touch_icon or
+     gitea_custom_footer_template or
+     gitea_custom_themes | length > 0 or
+     gitea_custom_public_files_src or
+     gitea_custom_templates_src) | bool
 
 - name: Configure Scheduled Backups
   ansible.builtin.include_tasks: backup.yml

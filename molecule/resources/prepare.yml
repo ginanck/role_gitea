@@ -1,6 +1,17 @@
 ---
+# role_gitea installs its own OS packages, system user, directories, systemd
+# unit and firewall rules, so the molecule scenario does not depend on
+# role_base. Keeping prepare minimal also keeps the test focused on the role
+# under test (role_base is still the documented prerequisite in production).
 - name: Prepare
   hosts: all
   become: true
-  roles:
-    - role_base
+  gather_facts: true
+  tasks:
+    - name: Ensure the DNF cache directory is writable
+      ansible.builtin.file:
+        path: /var/cache/dnf
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"

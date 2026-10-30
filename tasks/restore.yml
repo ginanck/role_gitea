@@ -1,0 +1,234 @@
+---
+# tasks/restore.yml — Restore users, repositories, settings and the database
+# from a `gitea dump` archive.
+#
+# Safety: the task refuses to overwrite an existing instance unless
+# gitea_restore_force is true, verifies that the archive contains a database
+# dump, keeps a copy of the current database and always restarts Gitea.
+
+- name: Validate Restore Request
+  ansible.builtin.assert:
+    that:
+      - gitea_restore_archive | length > 0
+      - gitea_restore_archive is match('^/')
+    fail_msg: "gitea_restore_archive must be an absolute path to a gitea dump archive"
+
+- name: Stat Restore Archive
+  ansible.builtin.stat:
+    path: "{{ gitea_restore_archive }}"
+  register: gitea_restore_archive_stat
+
+- name: Assert Restore Archive Exists
+  ansible.builtin.assert:
+    that:
+      - gitea_restore_archive_stat.stat.exists
+      - gitea_restore_archive_stat.stat.isreg
+    fail_msg: "Restore archive not found at {{ gitea_restore_archive }}"
+
+- name: Find Existing Repositories Before Restore
+  ansible.builtin.command:
+    cmd: "find {{ gitea_repository_root }} -mindepth 1 -maxdepth 1 -print -quit"
+  register: gitea_restore_existing_repos
+  changed_when: false
+  failed_when: false
+
+- name: Refuse to Overwrite Existing Data Unless Forced
+  ansible.builtin.fail:
+    msg: >-
+      Refusing to restore over an existing instance. Existing repositories
+      were found in {{ gitea_repository_root }}. Set gitea_restore_force: true
+      after taking a fresh backup to continue.
+  when:
+    - gitea_restore_existing_repos.stdout | length > 0
+    - not (gitea_restore_force | bool)
+
+- name: Create Restore Staging Directory
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: gitea-restore-
+  register: gitea_restore_tmp
+
+- name: Restore Gitea
+  block:
+    - name: Extract Restore Archive
+      ansible.builtin.unarchive:
+        src: "{{ gitea_restore_archive }}"
+        dest: "{{ gitea_restore_tmp.path }}"
+        remote_src: true
+
+    - name: Stat Database Dump Inside the Archive
+      ansible.builtin.stat:
+        path: "{{ gitea_restore_tmp.path }}/gitea-db.sql"
+      register: gitea_restore_db_dump
+
+    - name: Assert the Archive Contains a Database Dump
+      ansible.builtin.assert:
+        that:
+          - gitea_restore_db_dump.stat.exists
+          - gitea_restore_db_dump.stat.isreg
+        fail_msg: >-
+          The archive does not contain gitea-db.sql. Take the backup with
+          `gitea dump`; the dump is required to restore users and settings.
+
+    - name: Stop Gitea Before Restore
+      ansible.builtin.systemd:
+        name: "{{ gitea_service_name }}"
+        state: stopped
+
+    - name: Preserve the Current Database
+      ansible.builtin.copy:
+        src: "{{ gitea_db_path }}"
+        dest: "{{ gitea_db_path }}.pre-restore-{{ ansible_date_time.iso8601_basic_short }}"
+        remote_src: true
+        owner: "{{ gitea_user }}"
+        group: "{{ gitea_group }}"
+        mode: "0640"
+      when:
+        - gitea_restore_backup_current | bool
+        - gitea_db_type == 'sqlite3'
+        - gitea_db_path is exists
+
+    - name: Restore Repository Data
+      ansible.builtin.copy:
+        src: "{{ gitea_restore_tmp.path }}/repos/"
+        dest: "{{ gitea_repository_root }}/"
+        remote_src: true
+        owner: "{{ gitea_user }}"
+        group: "{{ gitea_group }}"
+        mode: preserve
+      when: (gitea_restore_tmp.path ~ '/repos') is exists
+
+    - name: Restore Application Data
+      ansible.builtin.copy:
+        src: "{{ gitea_restore_tmp.path }}/data/"
+        dest: "{{ gitea_data_dir }}/"
+        remote_src: true
+        owner: "{{ gitea_user }}"
+        group: "{{ gitea_group }}"
+        mode: preserve
+      when: (gitea_restore_tmp.path ~ '/data') is exists
+
+    - name: Restore Custom Files
+      ansible.builtin.copy:
+        src: "{{ gitea_restore_tmp.path }}/custom/"
+        dest: "{{ gitea_custom_dir }}/"
+        remote_src: true
+        owner: "{{ gitea_user }}"
+        group: "{{ gitea_group }}"
+        mode: preserve
+      when: (gitea_restore_tmp.path ~ '/custom') is exists
+
+    - name: Restore app.ini Settings
+      ansible.builtin.copy:
+        src: "{{ gitea_restore_tmp.path }}/app.ini"
+        dest: "{{ gitea_config_path }}"
+        remote_src: true
+        owner: "{{ gitea_user }}"
+        group: "{{ gitea_group }}"
+        mode: "0640"
+      when: (gitea_restore_tmp.path ~ '/app.ini') is exists
+
+    - name: Install SQLite Client
+      ansible.builtin.package:
+        name: "{{ 'sqlite' if ansible_facts['os_family'] == 'RedHat' else 'sqlite3' }}"
+        state: present
+      when: gitea_db_type == 'sqlite3'
+
+    - name: Remove the Current SQLite Database
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ gitea_db_path }}"
+        - "{{ gitea_db_path }}-wal"
+        - "{{ gitea_db_path }}-shm"
+      when: gitea_db_type == 'sqlite3'
+
+    - name: Restore SQLite Database from the Dump
+      ansible.builtin.shell:
+        cmd: >-
+          umask 077;
+          sqlite3 {{ gitea_db_path }} < {{ gitea_restore_tmp.path }}/gitea-db.sql
+        executable: /bin/sh
+      become: true
+      become_user: "{{ gitea_user }}"
+      environment:
+        HOME: "{{ gitea_home_dir }}"
+      when: gitea_db_type == 'sqlite3'
+
+    - name: Set Database Host and Port
+      ansible.builtin.set_fact:
+        gitea_restore_db_host: "{{ gitea_db_host.split(':')[0] }}"
+        gitea_restore_db_port: >-
+          {{ gitea_db_host.split(':')[1]
+             | default('5432' if gitea_db_type == 'postgres' else '3306') }}
+      when: gitea_db_type in ['mysql', 'postgres']
+
+    - name: Restore PostgreSQL Database from the Dump
+      ansible.builtin.command:
+        cmd: >-
+          psql --host {{ gitea_restore_db_host }}
+          --port {{ gitea_restore_db_port }}
+          --username {{ gitea_db_user }}
+          --dbname {{ gitea_db_name }}
+          --no-password
+          --file {{ gitea_restore_tmp.path }}/gitea-db.sql
+      environment:
+        PGPASSWORD: "{{ gitea_db_password }}"
+      become: true
+      become_user: "{{ gitea_user }}"
+      no_log: true
+      when: gitea_db_type == 'postgres'
+
+    - name: Restore MySQL Database from the Dump
+      ansible.builtin.shell:
+        cmd: >-
+          mysql --host {{ gitea_restore_db_host }}
+          --port {{ gitea_restore_db_port }}
+          --user {{ gitea_db_user }}
+          {{ gitea_db_name }}
+          < {{ gitea_restore_tmp.path }}/gitea-db.sql
+        executable: /bin/sh
+      environment:
+        MYSQL_PWD: "{{ gitea_db_password }}"
+      become: true
+      become_user: "{{ gitea_user }}"
+      no_log: true
+      when: gitea_db_type == 'mysql'
+
+    - name: Fail on Unsupported Database Backend for Restore
+      ansible.builtin.fail:
+        msg: "Restore is not implemented for gitea_db_type={{ gitea_db_type }}"
+      when: gitea_db_type not in ['sqlite3', 'mysql', 'postgres']
+
+    - name: Fix Ownership of Restored Data
+      ansible.builtin.file:
+        path: "{{ gitea_data_dir }}"
+        state: directory
+        owner: "{{ gitea_user }}"
+        group: "{{ gitea_group }}"
+        recurse: true
+
+  always:
+    - name: Start Gitea After Restore
+      ansible.builtin.systemd:
+        name: "{{ gitea_service_name }}"
+        state: started
+        enabled: "{{ gitea_service_enabled }}"
+
+    - name: Wait for Gitea After Restore
+      ansible.builtin.uri:
+        url: "{{ gitea_server_protocol }}://127.0.0.1:{{ gitea_server_http_port }}/"
+        method: GET
+        status_code: 200
+        validate_certs: false
+      register: gitea_restore_health
+      retries: 10
+      delay: 5
+      until: gitea_restore_health.status == 200
+      failed_when: false
+
+    - name: Remove Restore Staging Directory
+      ansible.builtin.file:
+        path: "{{ gitea_restore_tmp.path }}"
+        state: absent

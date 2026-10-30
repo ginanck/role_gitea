@@ -61,11 +61,30 @@ gitea_service_state: started
 # Server Configuration
 # =============================================================================
 
-gitea_server_protocol: http
+# TLS termination in Gitea itself. When gitea_tls_enabled is true the role
+# renders PROTOCOL = https and requires the certificate pair below. The
+# listener still uses gitea_server_http_port (Gitea's HTTPS port).
+# Set gitea_server_protocol explicitly only when integrating with an existing
+# inventory that already uses it; both paths are supported.
+gitea_tls_enabled: false
+gitea_server_protocol: "{{ 'https' if gitea_tls_enabled | bool else 'http' }}"
 gitea_server_domain: localhost
 gitea_server_root_url: "{{ gitea_server_protocol }}://{{ gitea_server_domain }}:{{ gitea_server_http_port }}/"
 gitea_server_http_addr: "0.0.0.0"
 gitea_server_http_port: 3000
+gitea_server_cert_file: "{{ gitea_config_dir }}/ssl/{{ gitea_server_domain }}.crt"
+gitea_server_key_file: "{{ gitea_config_dir }}/ssl/{{ gitea_server_domain }}.key"
+# Optional controller-side sources. When empty the certificate pair must
+# already exist on the target (for example installed by an internal CA role).
+gitea_tls_certificate_src: ""
+gitea_tls_key_src: ""
+
+# Redirect plain HTTP to HTTPS. Off by default; when TLS is enabled this is
+# turned on unless the operator disables it explicitly. Gitea listens for the
+# redirect on gitea_server_redirect_http_port (80 needs CAP_NET_BIND_SERVICE,
+# see gitea_systemd_cap_net_bind_service).
+gitea_server_redirect_http: "{{ gitea_tls_enabled | bool }}"
+gitea_server_redirect_http_port: 80
 gitea_server_ssh_domain: "{{ gitea_server_domain }}"
 gitea_server_ssh_port: 22
 gitea_server_start_ssh_server: false
@@ -212,6 +231,26 @@ gitea_backup_dir: "/opt/gitea/backups"
 gitea_backup_schedule: "*-*-* 02:00:00"
 gitea_backup_type: zip
 gitea_backup_retention_days: 30
+
+# Restore from an archive produced by `gitea dump` (or the backup timer).
+# Disabled by default; the restore path stops Gitea, restores the database
+# dump, repositories, data and app.ini, then starts Gitea again.
+gitea_restore_enabled: false
+gitea_restore_archive: ""
+gitea_restore_force: false
+gitea_restore_backup_current: true
+
+# =============================================================================
+# Firewall Configuration
+# =============================================================================
+
+# role_gitea re-enables firewalld on the Gitea host and only opens the Gitea
+# HTTP/HTTPS and SSH ports to gitea_allowed_source_ips (IPv4 CIDRs), normally
+# the load balancer or reverse proxy addresses. The default is loopback only,
+# which keeps a fresh install closed until the operator sets the real sources.
+gitea_firewall_enabled: true
+gitea_allowed_source_ips:
+  - 127.0.0.1/32
 
 # =============================================================================
 # Fail2ban Configuration

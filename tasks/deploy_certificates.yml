@@ -1,0 +1,70 @@
+---
+# tasks/deploy_certificates.yml — Deploy the TLS certificate pair.
+#
+# When gitea_tls_enabled is true Gitea serves HTTPS itself (PROTOCOL=https).
+# The certificate and key either come from controller-side sources
+# (gitea_tls_certificate_src / gitea_tls_key_src) or must already exist on the
+# target, for example because an internal CA role installed them.
+
+- name: Validate TLS Certificate Inputs
+  ansible.builtin.assert:
+    that:
+      - (gitea_tls_certificate_src | length > 0) == (gitea_tls_key_src | length > 0)
+    fail_msg: >-
+      Set both gitea_tls_certificate_src and gitea_tls_key_src, or neither
+      when the certificate pair is already present on the target.
+  when: gitea_tls_active | bool
+
+- name: Create Gitea TLS Directory
+  ansible.builtin.file:
+    path: "{{ gitea_server_cert_file | dirname }}"
+    state: directory
+    owner: root
+    group: "{{ gitea_group }}"
+    mode: "0750"
+  when: gitea_tls_active | bool
+
+- name: Deploy TLS Certificate
+  ansible.builtin.copy:
+    src: "{{ gitea_tls_certificate_src }}"
+    dest: "{{ gitea_server_cert_file }}"
+    owner: root
+    group: "{{ gitea_group }}"
+    mode: "0644"
+  when:
+    - gitea_tls_active | bool
+    - gitea_tls_certificate_src | length > 0
+  notify: restart gitea
+
+- name: Deploy TLS Private Key
+  ansible.builtin.copy:
+    src: "{{ gitea_tls_key_src }}"
+    dest: "{{ gitea_server_key_file }}"
+    owner: root
+    group: "{{ gitea_group }}"
+    mode: "0640"
+  when:
+    - gitea_tls_active | bool
+    - gitea_tls_key_src | length > 0
+  no_log: true
+  notify: restart gitea
+
+- name: Stat TLS Certificate Pair
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ gitea_server_cert_file }}"
+    - "{{ gitea_server_key_file }}"
+  register: gitea_tls_material
+  when: gitea_tls_active | bool
+
+- name: Assert TLS Certificate Pair Is Present
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+    fail_msg: "Gitea TLS material is missing at {{ item.item }}"
+  loop: "{{ gitea_tls_material.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: gitea_tls_active | bool

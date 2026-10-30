@@ -10,7 +10,10 @@ driver:
   name: docker
 platforms:
   - name: default
-    image: ghcr.io/ginanck/molecule-rockylinux:8-latest
+    # Rocky Linux 8 ships Python 3.6, which ansible-core 2.21 no longer
+    # supports. Use Rocky Linux 9 for the generic scenario; the role's meta
+    # declares support for AlmaLinux/RockyLinux 9 and 10.
+    image: ghcr.io/ginanck/molecule-rockylinux:9-latest
     pre_build_image: true
     privileged: true
     volumes:
@@ -26,6 +29,7 @@ provisioner:
   env:
     ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/dependency/roles:${MOLECULE_PROJECT_DIRECTORY}/..
     ANSIBLE_COLLECTIONS_PATH: ${MOLECULE_PROJECT_DIRECTORY}/dependency/collections
+    ANSIBLE_LOG_PATH: ${MOLECULE_EPHEMERAL_DIRECTORY}/ansible.log
   inventory:
     host_vars:
       default:
@@ -35,6 +39,7 @@ provisioner:
     converge: ../resources/converge.yml
     prepare: ../resources/prepare.yml
     verify: ../resources/verify.yml
+    side_effect: ../resources/side_effect.yml
 verifier:
   name: ansible
 scenario:

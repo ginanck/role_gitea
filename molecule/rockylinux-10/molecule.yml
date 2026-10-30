@@ -26,6 +26,7 @@ provisioner:
   env:
     ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/dependency/roles:${MOLECULE_PROJECT_DIRECTORY}/..
     ANSIBLE_COLLECTIONS_PATH: ${MOLECULE_PROJECT_DIRECTORY}/dependency/collections
+    ANSIBLE_LOG_PATH: ${MOLECULE_EPHEMERAL_DIRECTORY}/ansible.log
   inventory:
     host_vars:
       rockylinux-10:
@@ -35,6 +36,7 @@ provisioner:
     converge: ../resources/converge.yml
     prepare: ../resources/prepare.yml
     verify: ../resources/verify.yml
+    side_effect: ../resources/side_effect.yml
 verifier:
   name: ansible
 scenario:

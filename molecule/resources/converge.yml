@@ -2,5 +2,98 @@
 - name: Converge
   hosts: all
   become: true
+  vars:
+    gitea_tls_fixture_dir: >-
+      {{ (lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') or '/tmp/gitea-molecule')
+         ~ '/tls' }}
+    gitea_server_domain: localhost
+    gitea_tls_enabled: true
+    gitea_server_redirect_http: true
+    gitea_server_redirect_http_port: 3001
+    gitea_tls_certificate_src: "{{ gitea_tls_fixture_dir }}/server.crt"
+    gitea_tls_key_src: "{{ gitea_tls_fixture_dir }}/server.key"
+    gitea_admin_user:
+      username: gitea_admin
+      password: molecule-admin-S3cret
+      email: admin@example.com
+    gitea_backup_enabled: true
+    gitea_backup_retention_days: 3
+    gitea_allowed_source_ips:
+      - 127.0.0.1/32
+  pre_tasks:
+    - name: Create TLS Fixture Directory on the Controller
+      ansible.builtin.file:
+        path: "{{ gitea_tls_fixture_dir }}"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Generate Internal CA Key and Certificate
+      ansible.builtin.command:
+        cmd: >-
+          openssl req -x509 -nodes -newkey rsa:2048 -days 2
+          -subj /CN=Molecule-Internal-CA
+          -keyout {{ gitea_tls_fixture_dir }}/ca.key
+          -out {{ gitea_tls_fixture_dir }}/ca.crt
+        creates: "{{ gitea_tls_fixture_dir }}/ca.crt"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Write Server Certificate Extensions
+      ansible.builtin.copy:
+        content: |
+          subjectAltName = DNS:localhost, IP:127.0.0.1
+          extendedKeyUsage = serverAuth
+        dest: "{{ gitea_tls_fixture_dir }}/server.cnf"
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Generate Server Key and Certificate Signing Request
+      ansible.builtin.command:
+        cmd: >-
+          openssl req -new -nodes -newkey rsa:2048
+          -subj /CN=localhost
+          -keyout {{ gitea_tls_fixture_dir }}/server.key
+          -out {{ gitea_tls_fixture_dir }}/server.csr
+        creates: "{{ gitea_tls_fixture_dir }}/server.key"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Sign the Server Certificate With the Internal CA
+      ansible.builtin.command:
+        cmd: >-
+          openssl x509 -req -days 2
+          -in {{ gitea_tls_fixture_dir }}/server.csr
+          -CA {{ gitea_tls_fixture_dir }}/ca.crt
+          -CAkey {{ gitea_tls_fixture_dir }}/ca.key
+          -CAcreateserial
+          -extfile {{ gitea_tls_fixture_dir }}/server.cnf
+          -out {{ gitea_tls_fixture_dir }}/server.crt
+        creates: "{{ gitea_tls_fixture_dir }}/server.crt"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Create Internal CA Directory on the Target
+      ansible.builtin.file:
+        path: /var/tmp/gitea-tls
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Publish the Internal CA to the Target for Verification
+      ansible.builtin.copy:
+        src: "{{ gitea_tls_fixture_dir }}/ca.crt"
+        dest: /var/tmp/gitea-tls/ca.crt
+        owner: root
+        group: root
+        mode: "0644"
   roles:
     - role_gitea

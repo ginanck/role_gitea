@@ -1,20 +1,25 @@
 ---
-# tasks/create_admin_user.yml — Create Gitea admin user via CLI
+# tasks/create_admin_user.yml — Create the initial Gitea admin user via CLI.
+#
+# The password is written to a 0600 file owned by root, read by the shell and
+# never placed in a task result. Every task that touches it uses no_log so the
+# value cannot leak into the run output.
 
 - name: Flush Handlers to Ensure Gitea Is Running Before Admin User Creation
   ansible.builtin.meta: flush_handlers
 
 - name: Wait for Gitea Service to Be Ready
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ gitea_server_http_port }}/"
+    url: "{{ gitea_server_protocol }}://127.0.0.1:{{ gitea_server_http_port }}/"
     method: GET
     status_code: 200
+    validate_certs: false
   register: gitea_health_admin
   retries: 10
   delay: 5
   until: gitea_health_admin.status == 200
 
-- name: Check If Admin User Already Exists
+- name: List Existing Gitea Users
   ansible.builtin.command:
     cmd: >-
       {{ gitea_binary_link_path }}/gitea admin user list
@@ -27,21 +32,50 @@
     GITEA_WORK_DIR: "{{ gitea_work_dir }}"
     HOME: "{{ gitea_home_dir }}"
 
-- name: Create Gitea Admin User
-  ansible.builtin.command:
-    cmd: >-
-      {{ gitea_binary_link_path }}/gitea admin user create
-      --config {{ gitea_config_path }}
-      --username "{{ gitea_admin_user.username }}"
-      --password "{{ gitea_admin_user.password }}"
-      --email "{{ gitea_admin_user.email }}"
-      --admin
-      --must-change-password=false
-  when: gitea_admin_user.username not in gitea_user_list.stdout
-  changed_when: true
-  become: true
-  become_user: "{{ gitea_user }}"
-  environment:
-    GITEA_WORK_DIR: "{{ gitea_work_dir }}"
-    HOME: "{{ gitea_home_dir }}"
-  no_log: false
+- name: Determine Whether the Admin User Exists
+  ansible.builtin.set_fact:
+    gitea_admin_user_exists: >-
+      {{ gitea_user_list.stdout_lines[1:]
+         | map('split')
+         | map(attribute=1)
+         | select('equalto', gitea_admin_user.username)
+         | list | length > 0 }}
+
+- name: Provision the Gitea Admin User
+  when: not (gitea_admin_user_exists | bool)
+  block:
+    - name: Write the Admin Password to a Restricted Temporary File
+      ansible.builtin.copy:
+        content: "{{ gitea_admin_user.password }}"
+        dest: "{{ gitea_config_dir }}/.gitea-admin-password"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+    - name: Create Gitea Admin User
+      ansible.builtin.shell:
+        cmd: >-
+          umask 077;
+          {{ gitea_binary_link_path }}/gitea admin user create
+          --config {{ gitea_config_path }}
+          --username "{{ gitea_admin_user.username }}"
+          --password "$(cat {{ gitea_config_dir }}/.gitea-admin-password)"
+          --email "{{ gitea_admin_user.email }}"
+          --admin
+          --must-change-password=false
+        executable: /bin/sh
+      become: true
+      become_user: "{{ gitea_user }}"
+      environment:
+        GITEA_WORK_DIR: "{{ gitea_work_dir }}"
+        HOME: "{{ gitea_home_dir }}"
+      changed_when: true
+      no_log: true
+
+  always:
+    - name: Remove the Temporary Admin Password File
+      ansible.builtin.file:
+        path: "{{ gitea_config_dir }}/.gitea-admin-password"
+        state: absent
+      no_log: true

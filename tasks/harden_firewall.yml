@@ -43,9 +43,7 @@
         permanent: true
         immediate: true
         zone: public
-      loop:
-        - "{{ gitea_server_http_port }}"
-        - "{{ gitea_server_ssh_port }}"
+      loop: "{{ gitea_firewall_ports }}"
 
     - name: Allow Gitea Backend Ports Only From Load Balancer Sources
       ansible.posix.firewalld:
@@ -56,7 +54,7 @@
         permanent: true
         immediate: true
         zone: public
-      loop: "{{ gitea_allowed_source_ips | product([gitea_server_http_port, gitea_server_ssh_port]) | list }}"
+      loop: "{{ gitea_allowed_source_ips | product(gitea_firewall_ports) | list }}"
       loop_control:
         label: "{{ item.0 }} → :{{ item.1 }}"
 

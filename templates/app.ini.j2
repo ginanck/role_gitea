@@ -29,6 +29,14 @@ DOMAIN = {{ gitea_server_domain }}
 ROOT_URL = {{ gitea_server_root_url }}
 HTTP_ADDR = {{ gitea_server_http_addr }}
 HTTP_PORT = {{ gitea_server_http_port }}
+{% if gitea_tls_active | bool %}
+CERT_FILE = {{ gitea_server_cert_file }}
+KEY_FILE = {{ gitea_server_key_file }}
+REDIRECT_OTHER_PORT = {{ gitea_server_redirect_http | bool | lower }}
+{% if gitea_server_redirect_http | bool %}
+PORT_TO_REDIRECT = {{ gitea_server_redirect_http_port }}
+{% endif %}
+{% endif %}
 SSH_DOMAIN = {{ gitea_server_ssh_domain }}
 SSH_PORT = {{ gitea_server_ssh_port }}
 START_SSH_SERVER = {{ gitea_server_start_ssh_server | lower }}
